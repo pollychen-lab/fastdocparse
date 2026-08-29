@@ -1,6 +1,6 @@
 [project]
 name = "fastdocparse"
-version = "0.1.1"
+version = "0.2.0"
 description = "Extract structured data from semi-structured documents using any OpenAI-compatible LLM, with per-field grounding and confidence."
 readme = "README.md"
 license = "MIT"
@@ -19,7 +19,7 @@ dependencies = [
 dev = ["pytest"]
 
 [project.scripts]
-docextract = "docextract.cli:app"
+fastdocparse = "fastdocparse.cli:app"
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -29,7 +29,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-docextract = ["schemas/*.json", "py.typed"]
+fastdocparse = ["schemas/*.json", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

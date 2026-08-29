@@ -1,7 +1,7 @@
-"""docextract — extract structured data from semi-structured documents using any
+"""fastdocparse — extract structured data from semi-structured documents using any
 OpenAI-compatible LLM, with per-field grounding and confidence.
 
-    from docextract import Schema, Field, LLMClient, DocumentParser
+    from fastdocparse import Schema, Field, LLMClient, DocumentParser
 
     schema = Schema(name="Invoice", fields=[Field(name="total", description="Grand total", type="number")])
     client = LLMClient(model="gpt-4o-mini", api_key="sk-...")
@@ -19,10 +19,8 @@ from .schema_compiler import compile_schema_from_description
 
 try:
     from importlib.metadata import version as _pkg_version
-    # Looks up by the PyPI *distribution* name, not the import name — these differ
-    # ("docextract" was blocked by PyPI's name-similarity rule against the existing
-    # "doc-extract", so the distribution is registered as "fastdocparse"). Keep this
-    # in sync with pyproject.toml's [project] name if that ever changes again.
+    # Looks up by the PyPI *distribution* name (pyproject.toml's [project] name) — keep
+    # this string in sync with that if the distribution is ever renamed again.
     __version__ = _pkg_version("fastdocparse")
 except Exception:
     __version__ = "0.0.0+unknown"

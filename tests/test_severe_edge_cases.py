@@ -10,11 +10,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from docextract.grounding import validate_field_constraints
-from docextract.json_repair import parse_json_from_llm
-from docextract.parser import DocumentParser, EmptyDocumentError
-from docextract.pdf_utils import chunk_document_text
-from docextract.schema import Schema, Field
+from fastdocparse.grounding import validate_field_constraints
+from fastdocparse.json_repair import parse_json_from_llm
+from fastdocparse.parser import DocumentParser, EmptyDocumentError
+from fastdocparse.pdf_utils import chunk_document_text
+from fastdocparse.schema import Schema, Field
 
 
 def test_catastrophic_backtracking_pattern_does_not_hang():
@@ -33,8 +33,8 @@ def test_catastrophic_backtracking_pattern_does_not_hang():
     """
     code = (
         "import time\n"
-        "from docextract.grounding import validate_field_constraints\n"
-        "from docextract.schema import Schema, Field\n"
+        "from fastdocparse.grounding import validate_field_constraints\n"
+        "from fastdocparse.schema import Schema, Field\n"
         "schema = Schema(name='T', fields=[Field(name='x', description='x', pattern=r'^(a+)+$')])\n"
         "start = time.time()\n"
         "validate_field_constraints(schema, {'x': 'a' * 30 + '!'})\n"
@@ -67,7 +67,7 @@ def test_empty_string_value_not_trivially_grounded():
     mock_client.extract.return_value = '{"x": ""}'
     schema = Schema(name="T", fields=[Field(name="x", description="x", required=True)])
     parser = DocumentParser(client=mock_client)
-    with patch("docextract.parser.extract_text_from_pdf", return_value="padding padding padding padding padding"):
+    with patch("fastdocparse.parser.extract_text_from_pdf", return_value="padding padding padding padding padding"):
         res = parser.extract(b"dummy", schema)
     assert "grounded" not in res["x"]["flags"]
     assert res["x"]["value"] is None

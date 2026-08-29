@@ -33,15 +33,15 @@ Nothing in this project is tied to OpenAI specifically — swapping `--base-url`
 
 A schema is a JSON (or YAML) file listing the fields you want extracted. Two are bundled as starting points:
 
-- [`src/docextract/schemas/invoice.json`](../src/docextract/schemas/invoice.json) — invoice number, dates, parties, line items, few-shot examples included.
-- [`src/docextract/schemas/shipment_manifest.json`](../src/docextract/schemas/shipment_manifest.json) — bill of lading, container number, HS code, shipment status (with `required`/`pattern`/`enum` constraints).
+- [`src/fastdocparse/schemas/invoice.json`](../src/fastdocparse/schemas/invoice.json) — invoice number, dates, parties, line items, few-shot examples included.
+- [`src/fastdocparse/schemas/shipment_manifest.json`](../src/fastdocparse/schemas/shipment_manifest.json) — bill of lading, container number, HS code, shipment status (with `required`/`pattern`/`enum` constraints).
 
 Copy one and edit field names/descriptions for your document type, or write your own from scratch — see the [Schema Guide](schema-guide.md) for every option.
 
 **Don't want to write JSON at all?** Describe what you want in plain English:
 
 ```bash
-docextract schema-from-text \
+fastdocparse schema-from-text \
   "Extract the invoice number, total price, and vendor name. Invoice number and total are required." \
   --output schemas/my_invoice.json
 ```
@@ -51,7 +51,7 @@ This makes one LLM call, writes `schemas/my_invoice.json`, and prints a confirma
 ### A.2 Run extraction
 
 ```bash
-docextract extract <document.pdf-or-png-or-jpg> <schema.json> \
+fastdocparse extract <document.pdf-or-png-or-jpg> <schema.json> \
   --model gpt-4o-mini \
   --api-key sk-...
 ```
@@ -59,7 +59,7 @@ docextract extract <document.pdf-or-png-or-jpg> <schema.json> \
 For a local Ollama model instead:
 
 ```bash
-docextract extract document.pdf src/docextract/schemas/invoice.json \
+fastdocparse extract document.pdf src/fastdocparse/schemas/invoice.json \
   --model llama3.2 \
   --base-url http://localhost:11434/v1 \
   --api-key ollama
@@ -87,7 +87,7 @@ See [Output & Validation](output-format.md) for the full shape and what each fla
 ### B.1 Define a schema in code
 
 ```python
-from docextract import Schema, Field
+from fastdocparse import Schema, Field
 
 schema = Schema(
     name="Invoice",
@@ -102,14 +102,14 @@ schema = Schema(
 Or load the same JSON/YAML file the CLI uses:
 
 ```python
-from docextract import Schema
-schema = Schema.from_file("src/docextract/schemas/invoice.json")
+from fastdocparse import Schema
+schema = Schema.from_file("src/fastdocparse/schemas/invoice.json")
 ```
 
 ### B.2 Create an LLM client
 
 ```python
-from docextract import LLMClient
+from fastdocparse import LLMClient
 
 client = LLMClient(model="gpt-4o-mini", api_key="sk-...")
 # or, for local Ollama:
@@ -119,7 +119,7 @@ client = LLMClient(base_url="http://localhost:11434/v1", api_key="ollama", model
 ### B.3 Extract
 
 ```python
-from docextract import DocumentParser
+from fastdocparse import DocumentParser
 
 parser = DocumentParser(client=client)
 
@@ -138,7 +138,7 @@ result = parser.extract(image_bytes, schema, is_image=True)
 ### B.4 Add custom validation rules (optional)
 
 ```python
-from docextract import numeric_sum_rule, date_parseable_rule
+from fastdocparse import numeric_sum_rule, date_parseable_rule
 
 result = parser.extract(
     document_bytes,
@@ -155,7 +155,7 @@ See [Output & Validation](output-format.md) for how to write your own rules from
 ### B.5 Tune extraction behavior (optional)
 
 ```python
-from docextract import ExtractionConfig
+from fastdocparse import ExtractionConfig
 
 config = ExtractionConfig(max_pages=10, chunk_max_tokens=4000)
 parser = DocumentParser(client=client, config=config)
@@ -167,7 +167,7 @@ Only PDF and images (PNG/JPG) are built in. To add another format (DOCX, XLSX, .
 write a function that turns document bytes into text and register it:
 
 ```python
-from docextract import DocumentParser
+from fastdocparse import DocumentParser
 
 def extract_docx_text(document_bytes: bytes, structured_mode: bool, config) -> str:
     ...  # your DOCX-to-text logic
@@ -186,18 +186,18 @@ different name, so it's never confused with the instance-scoped version at a cal
 
 **Using this from the CLI:** a fresh CLI process only knows the built-in `pdf`/`image`
 handlers, so a custom `kind` needs to be registered before the CLI dispatches. Set
-`DOCEXTRACT_PLUGINS` to a comma-separated list of importable module names — each one is
+`FASTDOCPARSE_PLUGINS` to a comma-separated list of importable module names — each one is
 imported at CLI startup, so put your `register_default_ingestion_handler(...)` call at
 module level in that file:
 
 ```bash
-DOCEXTRACT_PLUGINS=my_project.docx_plugin docextract extract contract.docx schema.json --kind docx
+FASTDOCPARSE_PLUGINS=my_project.docx_plugin fastdocparse extract contract.docx schema.json --kind docx
 ```
 
 **Security note:** this imports and runs whatever Python is in the module(s) you name,
 with no sandboxing — the same trust model as `PYTHONSTARTUP` or `DJANGO_SETTINGS_MODULE`.
 That's fine for pointing it at your own plugin on your own machine. Never let
-`DOCEXTRACT_PLUGINS` be set from an untrusted source (e.g. a parameter in a hosted
+`FASTDOCPARSE_PLUGINS` be set from an untrusted source (e.g. a parameter in a hosted
 service built on top of this CLI).
 
 ---

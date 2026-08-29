@@ -2,8 +2,8 @@
 
 import pytest
 
-from docextract.config import ExtractionConfig
-from docextract.grounding import Issue, date_parseable_rule, numeric_sum_rule
+from fastdocparse.config import ExtractionConfig
+from fastdocparse.grounding import Issue, date_parseable_rule, numeric_sum_rule
 
 
 def test_numeric_sum_rule_flags_mismatch():

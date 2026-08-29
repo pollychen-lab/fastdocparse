@@ -1,4 +1,4 @@
-# docextract
+# fastdocparse
 
 Extract structured data from semi-structured documents — invoices, bills, tax forms, resumes, bank statements, shipment manifests — using any OpenAI-compatible LLM (OpenAI, Ollama, vLLM, Groq, etc.), with **per-field grounding and confidence**, not just raw extraction.
 
@@ -20,7 +20,7 @@ No extra LLM call for any of this — it's deterministic, string/rule-based vali
 
 | | Who it's for | How |
 |---|---|---|
-| **CLI** | No coding needed | `docextract extract <file> <schema.json>` |
+| **CLI** | No coding needed | `fastdocparse extract <file> <schema.json>` |
 | **Python API** | Building it into your own app | `DocumentParser(client).extract(document_bytes, schema)` |
 
 Defining *what* to extract also has two paths — hand-write a JSON/YAML schema file, or describe it in plain English and let the LLM draft the schema for you.
@@ -31,13 +31,11 @@ Defining *what* to extract also has two paths — hand-write a JSON/YAML schema 
 pip install fastdocparse
 ```
 
-(That's the PyPI distribution name — it was the closest available name once `docextract` turned out to collide with an existing project. The import name, the CLI command, and everything else stay `docextract`: `from docextract import ...`, `docextract extract ...`.)
-
 For local development instead:
 
 ```bash
-git clone https://github.com/pranjalparmar/docextract
-cd document-extractor
+git clone https://github.com/pranjalparmar/fastdocparse
+cd fastdocparse
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -e ".[dev]"
@@ -51,11 +49,11 @@ You also need access to an LLM. Either:
 
 ```bash
 # 1. Extract using one of the bundled example schemas
-docextract extract sample_invoice.png src/docextract/schemas/invoice.json \
+fastdocparse extract sample_invoice.png src/fastdocparse/schemas/invoice.json \
   --model gpt-4o-mini --api-key sk-...
 
 # Or with a local model via Ollama (no API key needed):
-docextract extract sample_invoice.png src/docextract/schemas/invoice.json \
+fastdocparse extract sample_invoice.png src/fastdocparse/schemas/invoice.json \
   --model llama3.2 --base-url http://localhost:11434/v1 --api-key ollama
 ```
 
@@ -72,18 +70,18 @@ Output is JSON, printed to stdout (or saved with `--output result.json`):
 Don't want to write JSON at all? Describe the fields in plain English instead:
 
 ```bash
-docextract schema-from-text \
+fastdocparse schema-from-text \
   "I want the invoice number, total price, and vendor name. Invoice number and total are required." \
   --output my_invoice_schema.json
 
 # review my_invoice_schema.json, then:
-docextract extract my_invoice.pdf my_invoice_schema.json
+fastdocparse extract my_invoice.pdf my_invoice_schema.json
 ```
 
 ## Quickstart — Python API
 
 ```python
-from docextract import Schema, Field, LLMClient, DocumentParser
+from fastdocparse import Schema, Field, LLMClient, DocumentParser
 
 schema = Schema(
     name="Invoice",
@@ -116,4 +114,4 @@ Want to contribute? Start with [docs/architecture.md](docs/architecture.md) for 
 
 ## Status
 
-Core extraction, grounding, chunking, both CLI/API paths, and real packaging are implemented and tested (74 tests, `pytest -v`). Published on PyPI as [`fastdocparse`](https://pypi.org/project/fastdocparse/) — `pip install fastdocparse` installs a working `docextract` command and a proper `docextract.*` import namespace, verified end to end with a clean-virtualenv install straight from the real public index. Not yet done: a hosted API — see [document-extractor-spec.md](document-extractor-spec.md) for the roadmap.
+Core extraction, grounding, chunking, both CLI/API paths, and real packaging are implemented and tested (74 tests, `pytest -v`). Published on PyPI as [`fastdocparse`](https://pypi.org/project/fastdocparse/) — `pip install fastdocparse` installs a working `fastdocparse` command and a proper `fastdocparse.*` import namespace, verified end to end with a clean-virtualenv install straight from the real public index. Not yet done: a hosted API — see [document-extractor-spec.md](document-extractor-spec.md) for the roadmap.

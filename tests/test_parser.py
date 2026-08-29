@@ -4,11 +4,11 @@ import json
 import pytest
 from unittest.mock import MagicMock, patch
 
-from docextract.schema import Schema, Field
-from docextract.example_schemas import INVOICE_SCHEMA
-from docextract.llm_client import LLMClient
-from docextract.parser import DocumentParser, _parse_json_from_llm
-from docextract.grounding import Issue
+from fastdocparse.schema import Schema, Field
+from fastdocparse.example_schemas import INVOICE_SCHEMA
+from fastdocparse.llm_client import LLMClient
+from fastdocparse.parser import DocumentParser, _parse_json_from_llm
+from fastdocparse.grounding import Issue
 
 
 def test_tc1_1_invoice_schema_extraction():
@@ -27,7 +27,7 @@ def test_tc1_1_invoice_schema_extraction():
     
     parser = DocumentParser(client=mock_client)
     
-    with patch("docextract.parser.extract_text_from_pdf", return_value="Invoice INV-123 Total 100.0. This is a very long text to avoid OCR fallback."):
+    with patch("fastdocparse.parser.extract_text_from_pdf", return_value="Invoice INV-123 Total 100.0. This is a very long text to avoid OCR fallback."):
         res = parser.extract(b"dummy_pdf_bytes", schema)
         
     assert res["invoice_number"]["value"] == "INV-123"
@@ -47,7 +47,7 @@ def test_tc1_2_arbitrary_schema():
     mock_client.extract.return_value = '{"weather": "sunny", "mood": "happy"}'
     parser = DocumentParser(client=mock_client)
     
-    with patch("docextract.parser.extract_text_from_pdf", return_value="It is sunny and I am happy today and everything is great"):
+    with patch("fastdocparse.parser.extract_text_from_pdf", return_value="It is sunny and I am happy today and everything is great"):
         res = parser.extract(b"dummy", schema)
         
     assert "weather" in res
@@ -61,7 +61,7 @@ def test_tc1_3_scanned_receipt():
     mock_client.extract.return_value = '{"total": "15.00"}'
     parser = DocumentParser(client=mock_client)
     
-    with patch("docextract.parser.extract_text_from_image_ocr", return_value="Total: 15.00") as mock_ocr:
+    with patch("fastdocparse.parser.extract_text_from_image_ocr", return_value="Total: 15.00") as mock_ocr:
         res = parser.extract(b"dummy_img", schema, is_image=True)
         
     mock_ocr.assert_called_once()
@@ -106,7 +106,7 @@ def test_tc1_6_missing_field():
     mock_client.extract.return_value = '{"found_field": "yes"}'
     parser = DocumentParser(client=mock_client)
     
-    with patch("docextract.parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy yes"):
+    with patch("fastdocparse.parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy yes"):
         res = parser.extract(b"dummy", schema)
         
     assert res["found_field"]["value"] == "yes"
@@ -119,7 +119,7 @@ def test_tc2_1_grounded_value():
     mock_client.extract.return_value = '{"total": "15.00"}'
     parser = DocumentParser(client=mock_client)
     
-    with patch("docextract.parser.extract_text_from_pdf", return_value="Total amount is 15.00 for this bill."):
+    with patch("fastdocparse.parser.extract_text_from_pdf", return_value="Total amount is 15.00 for this bill."):
         res = parser.extract(b"dummy", schema)
         
     assert res["total"]["value"] == "15.00"
@@ -133,7 +133,7 @@ def test_tc2_2_ungrounded_value():
     mock_client.extract.return_value = '{"total": "99.99"}'
     parser = DocumentParser(client=mock_client)
     
-    with patch("docextract.parser.extract_text_from_pdf", return_value="Total amount is 15.00 for this bill."):
+    with patch("fastdocparse.parser.extract_text_from_pdf", return_value="Total amount is 15.00 for this bill."):
         res = parser.extract(b"dummy", schema)
         
     assert res["total"]["value"] == "99.99"
@@ -160,7 +160,7 @@ def test_tc2_3_cross_check_failure():
                 return [Issue(field="total", message="Mismatch"), Issue(field="line_items", message="Mismatch")]
         return None
     
-    with patch("docextract.parser.extract_text_from_pdf", return_value="total 100.0 items 20.0 50.0 and here is some extra padding text"):
+    with patch("fastdocparse.parser.extract_text_from_pdf", return_value="total 100.0 items 20.0 50.0 and here is some extra padding text"):
         res = parser.extract(b"dummy", schema, rules=[sum_check])
         
     assert "failed_check" in res["total"]["flags"]
@@ -179,7 +179,7 @@ def test_tc2_4_unparseable_date_flagged():
             return [Issue(field="date", message="Invalid date")]
         return None
         
-    with patch("docextract.parser.extract_text_from_pdf", return_value="date Not a date. Here is some more text to make it longer."):
+    with patch("fastdocparse.parser.extract_text_from_pdf", return_value="date Not a date. Here is some more text to make it longer."):
         res = parser.extract(b"dummy", schema, rules=[date_check])
         
     assert "failed_check" in res["date"]["flags"]
@@ -191,14 +191,14 @@ def test_tc2_5_no_extra_llm_calls():
     mock_client.extract.return_value = '{"total": "15.00"}'
     parser = DocumentParser(client=mock_client)
     
-    with patch("docextract.parser.extract_text_from_pdf", return_value="Total amount is 15.00 for this bill."):
+    with patch("fastdocparse.parser.extract_text_from_pdf", return_value="Total amount is 15.00 for this bill."):
         res = parser.extract(b"dummy", schema)
         
     mock_client.extract.assert_called_once()
 
 def test_tc3_1_schema_examples_compile():
     """TC3.1 - Prompt compiler includes examples if present and omits if not."""
-    from docextract.prompt_compiler import compile_prompt
+    from fastdocparse.prompt_compiler import compile_prompt
     
     # 0 examples
     schema_0 = Schema(name="NoExamples", fields=[Field(name="test", description="test field")])
@@ -225,7 +225,7 @@ def test_tc3_2_invoice_schema():
     mock_client.extract.return_value = '{"invoice_number": "INV-123", "total_price": 100.0, "exporter_name": "Acme"}'
     parser = DocumentParser(client=mock_client)
     
-    with patch("docextract.parser.extract_text_from_pdf", return_value="Acme Corp INV-123 100.0. Added text to avoid OCR fallback."):
+    with patch("fastdocparse.parser.extract_text_from_pdf", return_value="Acme Corp INV-123 100.0. Added text to avoid OCR fallback."):
         res = parser.extract(b"dummy", INVOICE_SCHEMA)
         
     assert res["invoice_number"]["value"] == "INV-123"
@@ -257,7 +257,7 @@ def test_tc4_1_structured_mode_enabled():
     mock_client.extract.return_value = '{"items": []}'
     parser = DocumentParser(client=mock_client)
     
-    with patch("docextract.parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy") as mock_extract:
+    with patch("fastdocparse.parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy") as mock_extract:
         parser.extract(b"dummy", schema)
         
     mock_extract.assert_called_once_with(b"dummy", max_pages=15, structured_mode=True)
@@ -269,19 +269,19 @@ def test_tc4_2_structured_mode_disabled():
     mock_client.extract.return_value = '{"text": "val"}'
     parser = DocumentParser(client=mock_client)
     
-    with patch("docextract.parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy") as mock_extract:
+    with patch("fastdocparse.parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy") as mock_extract:
         parser.extract(b"dummy", schema)
         
     mock_extract.assert_called_once_with(b"dummy", max_pages=15, structured_mode=False)
 
 def test_tc4_3_ocr_structured_formatting():
     """TC4.3 - Verify OCR engine formats output with X coordinates in structured_mode."""
-    from docextract.ocr_engine import extract_text_from_image_ocr, HAS_RAPID_OCR
+    from fastdocparse.ocr_engine import extract_text_from_image_ocr, HAS_RAPID_OCR
     if not HAS_RAPID_OCR:
         pytest.skip("RapidOCR not installed")
         
     # We mock the rapidocr return value to simulate an image containing two columns
-    with patch("docextract.ocr_engine._rapid_ocr") as mock_ocr, patch("docextract.ocr_engine.Image.open"):
+    with patch("fastdocparse.ocr_engine._rapid_ocr") as mock_ocr, patch("fastdocparse.ocr_engine.Image.open"):
         # result is a tuple (list_of_boxes, _)
         # Each box format: ([ [x0,y0], [x1,y1], [x2,y2], [x3,y3] ], text, confidence)
         mock_ocr.return_value = (
@@ -313,9 +313,9 @@ def test_tc5_1_list_chunking():
     ]
     parser = DocumentParser(client=mock_client)
     
-    with patch("docextract.parser.chunk_document_text", return_value=["chunk1", "chunk2"]), \
-         patch("docextract.parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy"), \
-         patch("docextract.parser.pymupdf.open"):
+    with patch("fastdocparse.parser.chunk_document_text", return_value=["chunk1", "chunk2"]), \
+         patch("fastdocparse.parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy"), \
+         patch("fastdocparse.parser.pymupdf.open"):
         res = parser.extract(b"dummy", schema)
         
     assert res["items"]["value"] == ["item1", "item2"]
@@ -331,9 +331,9 @@ def test_tc5_2_single_value_chunking():
     ]
     parser = DocumentParser(client=mock_client)
     
-    with patch("docextract.parser.chunk_document_text", return_value=["chunk1", "chunk2"]), \
-         patch("docextract.parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy"), \
-         patch("docextract.parser.pymupdf.open"):
+    with patch("fastdocparse.parser.chunk_document_text", return_value=["chunk1", "chunk2"]), \
+         patch("fastdocparse.parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy"), \
+         patch("fastdocparse.parser.pymupdf.open"):
         res = parser.extract(b"dummy", schema)
         
     assert res["total"]["value"] == 100
@@ -348,9 +348,9 @@ def test_tc5_3_truncation_flag():
     mock_doc = MagicMock()
     mock_doc.__len__.return_value = 20
     
-    with patch("docextract.parser.pymupdf.open", return_value=mock_doc), \
-         patch("docextract.parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy"), \
-         patch("docextract.parser.chunk_document_text", return_value=["chunk1"]):
+    with patch("fastdocparse.parser.pymupdf.open", return_value=mock_doc), \
+         patch("fastdocparse.parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy"), \
+         patch("fastdocparse.parser.chunk_document_text", return_value=["chunk1"]):
         res = parser.extract(b"dummy", schema)
         
     assert res["_meta"]["truncated"] is True

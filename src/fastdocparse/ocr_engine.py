@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # module without executing it, so this costs nothing at import time. The actual
 # `import rapidocr_onnxruntime` (which pulls in onnxruntime, opencv, numpy — measured
 # at ~1.2s) and RapidOCR() construction only happen lazily, on first real OCR call, via
-# _get_rapid_ocr() below. Without this, every `import docextract` would eagerly pay
+# _get_rapid_ocr() below. Without this, every `import fastdocparse` would eagerly pay
 # that cost even for code that never touches OCR (e.g. just building a Schema).
 HAS_RAPID_OCR = importlib.util.find_spec("rapidocr_onnxruntime") is not None
 

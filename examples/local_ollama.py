@@ -6,7 +6,7 @@ To run this:
 3. `pip install -e .` from the repo root, then: `python examples/local_ollama.py`
 """
 
-from docextract import Schema, Field, LLMClient, DocumentParser
+from fastdocparse import Schema, Field, LLMClient, DocumentParser
 
 def run_local_extraction():
     # 1. Define your schema
@@ -37,7 +37,7 @@ def run_local_extraction():
     from unittest.mock import patch
     sample_invoice_text = "Vendor: Tech Supplies Inc.\nInvoice Number: INV-2023-001\nTotal Due: $450.00"
     
-    with patch("docextract.parser.extract_text_from_pdf", return_value=sample_invoice_text):
+    with patch("fastdocparse.parser.extract_text_from_pdf", return_value=sample_invoice_text):
         try:
             # We pass b"dummy" because the patch intercepts the actual PDF parsing
             result = parser.extract(b"dummy_pdf_data", schema)

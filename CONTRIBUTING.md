@@ -31,11 +31,11 @@ All 74 tests should pass before you open a PR. CI runs this automatically on eve
 
 ## Project structure & where to contribute
 
-All library code lives under `src/docextract/` (installed as the `docextract` package); `test_*.py` files at the repo root import from it as `from docextract import ...` / `from docextract.parser import ...`, exactly as an external user would.
+All library code lives under `src/fastdocparse/` (installed as the `fastdocparse` package); `test_*.py` files at the repo root import from it as `from fastdocparse import ...` / `from fastdocparse.parser import ...`, exactly as an external user would.
 
 For the module map, the data-flow pipeline, the dependency graph between modules, and a diagram of where common contributions plug in, see **[docs/architecture.md](docs/architecture.md)** — kept as one diagram-based doc rather than duplicated here, so it doesn't drift out of sync with a second copy.
 
-New public functionality goes through `src/docextract/__init__.py`'s `__all__` — if it's meant to be used from `from docextract import X`, it needs to be re-exported there, not just defined in its own module.
+New public functionality goes through `src/fastdocparse/__init__.py`'s `__all__` — if it's meant to be used from `from fastdocparse import X`, it needs to be re-exported there, not just defined in its own module.
 
 ## Reporting issues
 

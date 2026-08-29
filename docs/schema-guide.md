@@ -63,7 +63,7 @@ Result comes back as a list of dicts: `[{"product_name": "Widget A", "unit_price
 }
 ```
 
-See [`src/docextract/schemas/shipment_manifest.json`](../src/docextract/schemas/shipment_manifest.json) for the full example.
+See [`src/fastdocparse/schemas/shipment_manifest.json`](../src/fastdocparse/schemas/shipment_manifest.json) for the full example.
 
 ## Few-shot examples (optional, improves accuracy)
 
@@ -87,24 +87,24 @@ Schemas can include example (document snippet → expected output) pairs. Useful
 
 Each example is a 2-element array: `[document_snippet_string, expected_output_object]`. The expected output must cover the fields you want to demonstrate — it doesn't need every field in the schema.
 
-See [`src/docextract/schemas/invoice.json`](../src/docextract/schemas/invoice.json) for a complete example with a few-shot pair.
+See [`src/fastdocparse/schemas/invoice.json`](../src/fastdocparse/schemas/invoice.json) for a complete example with a few-shot pair.
 
 ## Loading a schema file
 
 **Python:**
 ```python
-from docextract import Schema
-schema = Schema.from_file("src/docextract/schemas/invoice.json")   # or .yaml/.yml
+from fastdocparse import Schema
+schema = Schema.from_file("src/fastdocparse/schemas/invoice.json")   # or .yaml/.yml
 ```
 
-**CLI:** pass the path directly — `docextract extract doc.pdf src/docextract/schemas/invoice.json`.
+**CLI:** pass the path directly — `fastdocparse extract doc.pdf src/fastdocparse/schemas/invoice.json`.
 
 ## Writing a schema in Python instead of JSON
 
 Same shape, as Pydantic objects:
 
 ```python
-from docextract import Schema, Field
+from fastdocparse import Schema, Field
 
 schema = Schema(
     name="ShipmentManifest",
@@ -122,7 +122,7 @@ Use this path when you need something a static schema file can't express — e.g
 If you don't want to write JSON or Python at all:
 
 ```bash
-docextract schema-from-text \
+fastdocparse schema-from-text \
   "I want the bill of lading number (starts with BL-), shipment status which is one of in_transit, delivered, or customs_hold, and the destination country. Bill of lading and destination are required." \
   --output schemas/my_manifest.json
 ```

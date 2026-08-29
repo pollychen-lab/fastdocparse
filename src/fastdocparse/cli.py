@@ -1,8 +1,8 @@
 """Command-line entrypoint: extract fields from a document without writing code.
 
 Usage:
-    docextract extract document.pdf invoice_schema.json
-    docextract extract receipt.jpg shipment_schema.json --model llama3 --base-url http://localhost:11434/v1
+    fastdocparse extract document.pdf invoice_schema.json
+    fastdocparse extract receipt.jpg shipment_schema.json --model llama3 --base-url http://localhost:11434/v1
 """
 
 import importlib
@@ -21,18 +21,18 @@ from .schema_compiler import compile_schema_from_description
 
 
 def _load_plugins() -> None:
-    """Import modules listed in DOCEXTRACT_PLUGINS (comma-separated) so they can call
+    """Import modules listed in FASTDOCPARSE_PLUGINS (comma-separated) so they can call
     parser.register_default_ingestion_handler() on import — the only way a custom
     ingestion kind (DOCX, XLSX, ...) becomes reachable from this CLI, since a fresh CLI
     process otherwise only knows the built-in "pdf"/"image" handlers.
 
-    Security note: this imports and runs arbitrary Python from wherever DOCEXTRACT_PLUGINS
+    Security note: this imports and runs arbitrary Python from wherever FASTDOCPARSE_PLUGINS
     points, at CLI startup, with no sandboxing — the same trust model as PYTHONSTARTUP or
     DJANGO_SETTINGS_MODULE. That's fine for a user pointing it at their own plugin on their
     own machine, which is the only supported use. Never let this env var be set from an
     untrusted source (e.g. a request parameter in a hosted service built on this CLI).
     """
-    plugin_spec = os.environ.get("DOCEXTRACT_PLUGINS", "")
+    plugin_spec = os.environ.get("FASTDOCPARSE_PLUGINS", "")
     for module_name in filter(None, (p.strip() for p in plugin_spec.split(","))):
         importlib.import_module(module_name)
 
@@ -56,7 +56,7 @@ def extract(
     base_url: Optional[str] = typer.Option(None, "--base-url", help="OpenAI-compatible API base URL. Omit for OpenAI; use e.g. http://localhost:11434/v1 for Ollama."),
     api_key: Optional[str] = typer.Option(None, "--api-key", envvar="LLM_API_KEY", help="API key. Not needed for local Ollama."),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Write the JSON result to this file instead of printing it."),
-    kind: Optional[str] = typer.Option(None, "--kind", help="Override ingestion routing (e.g. 'docx' for a custom handler loaded via DOCEXTRACT_PLUGINS). Defaults to auto-detecting pdf/image from the file extension."),
+    kind: Optional[str] = typer.Option(None, "--kind", help="Override ingestion routing (e.g. 'docx' for a custom handler loaded via FASTDOCPARSE_PLUGINS). Defaults to auto-detecting pdf/image from the file extension."),
 ):
     """Extract the fields defined in SCHEMA from FILE and print the result as JSON."""
     if kind is None and file.suffix.lower() not in SUPPORTED_EXTENSIONS:
@@ -84,7 +84,7 @@ def extract(
         typer.echo(f"Could not complete extraction: {e}", err=True)
         raise typer.Exit(code=1)
     except UnknownIngestionKindError as e:
-        typer.echo(f"{e} (check --kind is spelled correctly and its plugin is loaded via DOCEXTRACT_PLUGINS)", err=True)
+        typer.echo(f"{e} (check --kind is spelled correctly and its plugin is loaded via FASTDOCPARSE_PLUGINS)", err=True)
         raise typer.Exit(code=1)
     except ValueError as e:
         typer.echo(f"Extraction failed: {e}", err=True)
@@ -133,7 +133,7 @@ def schema_from_text(
         raise typer.Exit(code=1)
 
     typer.echo(f"Saved schema '{doc_schema.name}' with {len(doc_schema.fields)} field(s) to {output}")
-    typer.echo("Review it, then run: docextract extract <your_document> " + str(output))
+    typer.echo("Review it, then run: fastdocparse extract <your_document> " + str(output))
 
 
 if __name__ == "__main__":
