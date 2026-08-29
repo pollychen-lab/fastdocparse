@@ -29,7 +29,7 @@ Every field declared in the schema appears in the output, even if nothing was fo
 
 | Key | Meaning |
 |---|---|
-| `truncated` | `true` if the source document had more pages than the configured limit (`ExtractionConfig.truncation_page_limit`, default 15) and was cut off. |
+| `truncated` | `true` if the source document had more pages than the configured limit (`ExtractionConfig.max_pages`, default 15) and was cut off. |
 | `truncation_reason` | Human-readable explanation, e.g. `"Document is 20 pages long, truncated to 15 pages."` |
 
 ### Per-field result
@@ -56,12 +56,12 @@ A field can carry multiple flags at once, e.g. `["ungrounded", "invalid_format"]
 
 ## Built-in cross-check rules
 
-Two ready-made rules ship in `grounding.py` — no need to write your own for these common cases:
+Two ready-made rules ship with `docextract` — no need to write your own for these common cases:
 
 ### `numeric_sum_rule` — flag when a total doesn't match a list's sum
 
 ```python
-from grounding import numeric_sum_rule
+from docextract import numeric_sum_rule
 
 rule = numeric_sum_rule(list_field="line_items", total_field="total_price", item_key="unit_price", tolerance=0.01)
 result = parser.extract(document_bytes, schema, rules=[rule])
@@ -72,7 +72,7 @@ Flags both `total_price` and `line_items` with `failed_check` if `sum(item["unit
 ### `date_parseable_rule` — flag an unparseable date
 
 ```python
-from grounding import date_parseable_rule
+from docextract import date_parseable_rule
 
 rule = date_parseable_rule("invoice_date", formats=["%Y-%m-%d"])  # formats optional, sensible defaults included
 result = parser.extract(document_bytes, schema, rules=[rule])
@@ -85,7 +85,7 @@ Flags the field with `failed_check` if its value doesn't match any of the given 
 A rule is any function `(extracted: dict) -> list[Issue] | None`:
 
 ```python
-from grounding import Issue
+from docextract import Issue
 
 def stock_check(extracted: dict) -> list[Issue] | None:
     qty = extracted.get("quantity")

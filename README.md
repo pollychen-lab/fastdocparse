@@ -1,4 +1,4 @@
-# Document Extractor
+# docextract
 
 Extract structured data from semi-structured documents — invoices, bills, tax forms, resumes, bank statements, shipment manifests — using any OpenAI-compatible LLM (OpenAI, Ollama, vLLM, Groq, etc.), with **per-field grounding and confidence**, not just raw extraction.
 
@@ -20,7 +20,7 @@ No extra LLM call for any of this — it's deterministic, string/rule-based vali
 
 | | Who it's for | How |
 |---|---|---|
-| **CLI** | No coding needed | `python cli.py extract <file> <schema.json>` |
+| **CLI** | No coding needed | `docextract extract <file> <schema.json>` |
 | **Python API** | Building it into your own app | `DocumentParser(client).extract(document_bytes, schema)` |
 
 Defining *what* to extract also has two paths — hand-write a JSON/YAML schema file, or describe it in plain English and let the LLM draft the schema for you.
@@ -28,10 +28,14 @@ Defining *what* to extract also has two paths — hand-write a JSON/YAML schema 
 ## Install
 
 ```bash
+git clone <this repo>
+cd document-extractor
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e .
 ```
+
+(Not yet published to PyPI — see [Status](#status). Until then, install from a local clone as above.)
 
 You also need access to an LLM. Either:
 - An OpenAI API key (`export OPENAI_API_KEY=...` or pass `--api-key`), or
@@ -41,11 +45,11 @@ You also need access to an LLM. Either:
 
 ```bash
 # 1. Extract using one of the bundled example schemas
-python cli.py extract sample_invoice.png schemas/invoice.json \
+docextract extract sample_invoice.png src/docextract/schemas/invoice.json \
   --model gpt-4o-mini --api-key sk-...
 
 # Or with a local model via Ollama (no API key needed):
-python cli.py extract sample_invoice.png schemas/invoice.json \
+docextract extract sample_invoice.png src/docextract/schemas/invoice.json \
   --model llama3.2 --base-url http://localhost:11434/v1 --api-key ollama
 ```
 
@@ -62,20 +66,18 @@ Output is JSON, printed to stdout (or saved with `--output result.json`):
 Don't want to write JSON at all? Describe the fields in plain English instead:
 
 ```bash
-python cli.py schema-from-text \
+docextract schema-from-text \
   "I want the invoice number, total price, and vendor name. Invoice number and total are required." \
-  --output schemas/my_invoice.json
+  --output my_invoice_schema.json
 
-# review schemas/my_invoice.json, then:
-python cli.py extract my_invoice.pdf schemas/my_invoice.json
+# review my_invoice_schema.json, then:
+docextract extract my_invoice.pdf my_invoice_schema.json
 ```
 
 ## Quickstart — Python API
 
 ```python
-from schema import Schema, Field
-from llm_client import LLMClient
-from parser import DocumentParser
+from docextract import Schema, Field, LLMClient, DocumentParser
 
 schema = Schema(
     name="Invoice",
@@ -101,8 +103,11 @@ print(result["invoice_number"])  # {'value': 'INV-9011', 'confidence': 'high', '
 - [Getting Started](docs/getting-started.md) — step-by-step install, CLI, and API walkthroughs
 - [Schema Guide](docs/schema-guide.md) — every field option (`type`, `required`, `pattern`, `enum`, `sub_fields`, few-shot `examples`), for JSON, YAML, and plain-English authoring
 - [Output & Validation](docs/output-format.md) — the full result shape, what each confidence flag means, and how to write custom cross-check rules
+- [Architecture](docs/architecture.md) — diagrams of the pipeline, the module dependency graph, and where to plug in a contribution
 - [Project spec](document-extractor-spec.md) — architecture, phased roadmap, honest competitive positioning
+
+Want to contribute? Start with [docs/architecture.md](docs/architecture.md) for the map, then [CONTRIBUTING.md](CONTRIBUTING.md) for the process.
 
 ## Status
 
-Core extraction, grounding, chunking, and both CLI/API paths are implemented and tested (`pytest test_parser.py`). Not yet done: PyPI packaging, a hosted API, and a formal license — see [document-extractor-spec.md](document-extractor-spec.md) for the roadmap.
+Core extraction, grounding, chunking, both CLI/API paths, and real packaging (`pip install -e .` installs a working `docextract` command and a proper `docextract.*` import namespace — verified with a from-scratch build and a clean-virtualenv install) are implemented and tested (74 tests, `pytest -v`). Not yet done: actually publishing to PyPI and a hosted API — see [document-extractor-spec.md](document-extractor-spec.md) for the roadmap.

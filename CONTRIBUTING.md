@@ -5,7 +5,7 @@
 ```bash
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 ## Running the tests
@@ -14,7 +14,7 @@ pip install -r requirements.txt
 pytest -v
 ```
 
-All 63 tests should pass before you open a PR. CI runs this automatically on every push and PR, but running it locally first saves a round-trip.
+All 74 tests should pass before you open a PR. CI runs this automatically on every push and PR, but running it locally first saves a round-trip.
 
 ## Before opening a PR
 
@@ -29,20 +29,13 @@ All 63 tests should pass before you open a PR. CI runs this automatically on eve
 - Prefer extending an existing module's pattern over introducing a new one. E.g. a new document format is a new function in `parser.py`'s `INGESTION_HANDLERS`-style registry, not a parallel ingestion system; a new validation rule is a new factory function in `grounding.py`, not a new file.
 - Config knobs belong in `config.py`'s `ExtractionConfig`, not as hardcoded constants scattered through the pipeline — that was a real bug here once (two disconnected page-limit constants caused silent data loss; see `config.py`'s comment on `max_pages`).
 
-## Project structure
+## Project structure & where to contribute
 
-| File | Responsibility |
-|---|---|
-| `schema.py` | `Field`/`Schema` definitions + loaders (Python/JSON/YAML) |
-| `schema_compiler.py` | Plain-English description → `Schema`, via one LLM call |
-| `prompt_compiler.py` | `Schema` → extraction prompt |
-| `llm_client.py` | OpenAI-compatible adapter, with retry/error handling |
-| `pdf_utils.py` / `ocr_engine.py` | Document → text ingestion |
-| `parser.py` | Orchestrates ingest → chunk → extract → merge → validate |
-| `grounding.py` | Confidence/validation checks (grounding, constraints, cross-check rules) |
-| `cache.py` | Opt-in caching for `DocumentParser.extract()` |
-| `result.py` | Optional typed view of the output dict |
-| `cli.py` | CLI wrapper — no logic that doesn't already exist above |
+All library code lives under `src/docextract/` (installed as the `docextract` package); `test_*.py` files at the repo root import from it as `from docextract import ...` / `from docextract.parser import ...`, exactly as an external user would.
+
+For the module map, the data-flow pipeline, the dependency graph between modules, and a diagram of where common contributions plug in, see **[docs/architecture.md](docs/architecture.md)** — kept as one diagram-based doc rather than duplicated here, so it doesn't drift out of sync with a second copy.
+
+New public functionality goes through `src/docextract/__init__.py`'s `__all__` — if it's meant to be used from `from docextract import X`, it needs to be re-exported there, not just defined in its own module.
 
 ## Reporting issues
 

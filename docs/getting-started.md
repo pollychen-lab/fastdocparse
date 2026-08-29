@@ -9,7 +9,7 @@ git clone <this repo>
 cd document-extractor
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e .
 ```
 
 ## 2. Get access to an LLM
@@ -33,15 +33,15 @@ Nothing in this project is tied to OpenAI specifically — swapping `--base-url`
 
 A schema is a JSON (or YAML) file listing the fields you want extracted. Two are bundled as starting points:
 
-- [`schemas/invoice.json`](../schemas/invoice.json) — invoice number, dates, parties, line items, few-shot examples included.
-- [`schemas/shipment_manifest.json`](../schemas/shipment_manifest.json) — bill of lading, container number, HS code, shipment status (with `required`/`pattern`/`enum` constraints).
+- [`src/docextract/schemas/invoice.json`](../src/docextract/schemas/invoice.json) — invoice number, dates, parties, line items, few-shot examples included.
+- [`src/docextract/schemas/shipment_manifest.json`](../src/docextract/schemas/shipment_manifest.json) — bill of lading, container number, HS code, shipment status (with `required`/`pattern`/`enum` constraints).
 
 Copy one and edit field names/descriptions for your document type, or write your own from scratch — see the [Schema Guide](schema-guide.md) for every option.
 
 **Don't want to write JSON at all?** Describe what you want in plain English:
 
 ```bash
-python cli.py schema-from-text \
+docextract schema-from-text \
   "Extract the invoice number, total price, and vendor name. Invoice number and total are required." \
   --output schemas/my_invoice.json
 ```
@@ -51,7 +51,7 @@ This makes one LLM call, writes `schemas/my_invoice.json`, and prints a confirma
 ### A.2 Run extraction
 
 ```bash
-python cli.py extract <document.pdf-or-png-or-jpg> <schema.json> \
+docextract extract <document.pdf-or-png-or-jpg> <schema.json> \
   --model gpt-4o-mini \
   --api-key sk-...
 ```
@@ -59,7 +59,7 @@ python cli.py extract <document.pdf-or-png-or-jpg> <schema.json> \
 For a local Ollama model instead:
 
 ```bash
-python cli.py extract document.pdf schemas/invoice.json \
+docextract extract document.pdf src/docextract/schemas/invoice.json \
   --model llama3.2 \
   --base-url http://localhost:11434/v1 \
   --api-key ollama
@@ -87,7 +87,7 @@ See [Output & Validation](output-format.md) for the full shape and what each fla
 ### B.1 Define a schema in code
 
 ```python
-from schema import Schema, Field
+from docextract import Schema, Field
 
 schema = Schema(
     name="Invoice",
@@ -102,14 +102,14 @@ schema = Schema(
 Or load the same JSON/YAML file the CLI uses:
 
 ```python
-from schema import Schema
-schema = Schema.from_file("schemas/invoice.json")
+from docextract import Schema
+schema = Schema.from_file("src/docextract/schemas/invoice.json")
 ```
 
 ### B.2 Create an LLM client
 
 ```python
-from llm_client import LLMClient
+from docextract import LLMClient
 
 client = LLMClient(model="gpt-4o-mini", api_key="sk-...")
 # or, for local Ollama:
@@ -119,7 +119,7 @@ client = LLMClient(base_url="http://localhost:11434/v1", api_key="ollama", model
 ### B.3 Extract
 
 ```python
-from parser import DocumentParser
+from docextract import DocumentParser
 
 parser = DocumentParser(client=client)
 
@@ -138,7 +138,7 @@ result = parser.extract(image_bytes, schema, is_image=True)
 ### B.4 Add custom validation rules (optional)
 
 ```python
-from grounding import numeric_sum_rule, date_parseable_rule
+from docextract import numeric_sum_rule, date_parseable_rule
 
 result = parser.extract(
     document_bytes,
@@ -155,7 +155,7 @@ See [Output & Validation](output-format.md) for how to write your own rules from
 ### B.5 Tune extraction behavior (optional)
 
 ```python
-from config import ExtractionConfig
+from docextract import ExtractionConfig
 
 config = ExtractionConfig(max_pages=10, chunk_max_tokens=4000)
 parser = DocumentParser(client=client, config=config)
@@ -167,7 +167,7 @@ Only PDF and images (PNG/JPG) are built in. To add another format (DOCX, XLSX, .
 write a function that turns document bytes into text and register it:
 
 ```python
-from parser import DocumentParser
+from docextract import DocumentParser
 
 def extract_docx_text(document_bytes: bytes, structured_mode: bool, config) -> str:
     ...  # your DOCX-to-text logic
@@ -191,7 +191,7 @@ imported at CLI startup, so put your `register_default_ingestion_handler(...)` c
 module level in that file:
 
 ```bash
-DOCEXTRACT_PLUGINS=my_project.docx_plugin python cli.py extract contract.docx schema.json --kind docx
+DOCEXTRACT_PLUGINS=my_project.docx_plugin docextract extract contract.docx schema.json --kind docx
 ```
 
 **Security note:** this imports and runs whatever Python is in the module(s) you name,
@@ -205,5 +205,6 @@ service built on top of this CLI).
 ## Running the tests
 
 ```bash
-pytest test_parser.py -v
+pip install -e ".[dev]"
+pytest -v
 ```
