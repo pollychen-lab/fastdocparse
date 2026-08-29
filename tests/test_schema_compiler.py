@@ -3,8 +3,8 @@
 import pytest
 from unittest.mock import MagicMock
 
-from llm_client import LLMClient
-from schema_compiler import compile_schema_from_description
+from docextract.llm_client import LLMClient
+from docextract.schema_compiler import compile_schema_from_description
 
 
 def test_compile_schema_from_description_success():

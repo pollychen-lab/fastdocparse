@@ -6,12 +6,12 @@ from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
-from cli import app
+from docextract.cli import app
 
 runner = CliRunner()
-REPO_ROOT = Path(__file__).parent
+REPO_ROOT = Path(__file__).parent.parent
 SAMPLE_IMAGE = REPO_ROOT / "sample_invoice.png"
-INVOICE_SCHEMA_PATH = REPO_ROOT / "schemas" / "invoice.json"
+INVOICE_SCHEMA_PATH = REPO_ROOT / "src" / "docextract" / "schemas" / "invoice.json"
 
 
 def _mock_openai_returning(content: str):
@@ -26,7 +26,7 @@ def test_extract_command_success():
         "exporter_address": None, "importer_name": None, "importer_address": None,
         "currency": None, "total_price": None, "line_items": [],
     })
-    with patch("llm_client.OpenAI", return_value=_mock_openai_returning(fake_result)):
+    with patch("docextract.llm_client.OpenAI", return_value=_mock_openai_returning(fake_result)):
         result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH)])
 
     assert result.exit_code == 0
@@ -62,7 +62,7 @@ def test_extract_command_writes_output_file(tmp_path):
         "currency": None, "total_price": None, "line_items": [],
     })
     output_path = tmp_path / "result.json"
-    with patch("llm_client.OpenAI", return_value=_mock_openai_returning(fake_result)):
+    with patch("docextract.llm_client.OpenAI", return_value=_mock_openai_returning(fake_result)):
         result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH), "--output", str(output_path)])
 
     assert result.exit_code == 0
@@ -76,7 +76,7 @@ def test_schema_from_text_success(tmp_path):
         "fields": [{"name": "bill_of_lading", "description": "B/L number", "required": True}],
     })
     output_path = tmp_path / "generated.json"
-    with patch("llm_client.OpenAI", return_value=_mock_openai_returning(fake_schema)):
+    with patch("docextract.llm_client.OpenAI", return_value=_mock_openai_returning(fake_schema)):
         result = runner.invoke(app, ["schema-from-text", "the bill of lading number", "--output", str(output_path)])
 
     assert result.exit_code == 0
@@ -92,7 +92,7 @@ def test_extract_command_creates_missing_output_directory(tmp_path):
         "currency": None, "total_price": None, "line_items": [],
     })
     output_path = tmp_path / "nested" / "dir" / "result.json"
-    with patch("llm_client.OpenAI", return_value=_mock_openai_returning(fake_result)):
+    with patch("docextract.llm_client.OpenAI", return_value=_mock_openai_returning(fake_result)):
         result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH), "--output", str(output_path)])
 
     assert result.exit_code == 0
@@ -112,7 +112,7 @@ def test_schema_from_text_creates_missing_output_directory(tmp_path):
         "fields": [{"name": "bill_of_lading", "description": "B/L number", "required": True}],
     })
     output_path = tmp_path / "nested" / "dir" / "generated.json"
-    with patch("llm_client.OpenAI", return_value=_mock_openai_returning(fake_schema)):
+    with patch("docextract.llm_client.OpenAI", return_value=_mock_openai_returning(fake_schema)):
         result = runner.invoke(app, ["schema-from-text", "the bill of lading number", "--output", str(output_path)])
 
     assert result.exit_code == 0
@@ -121,7 +121,7 @@ def test_schema_from_text_creates_missing_output_directory(tmp_path):
 
 def test_schema_from_text_reports_generation_failure_cleanly(tmp_path):
     output_path = tmp_path / "generated.json"
-    with patch("llm_client.OpenAI", return_value=_mock_openai_returning("not json at all")):
+    with patch("docextract.llm_client.OpenAI", return_value=_mock_openai_returning("not json at all")):
         result = runner.invoke(app, ["schema-from-text", "vague request", "--output", str(output_path)])
 
     assert result.exit_code == 1

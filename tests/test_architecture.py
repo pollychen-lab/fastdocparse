@@ -8,11 +8,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cache import InMemoryCache, make_cache_key
-from config import ExtractionConfig
-from example_schemas import INVOICE_SCHEMA
-from parser import INGESTION_HANDLERS, DocumentParser, register_default_ingestion_handler
-from schema import Field, Schema
+from docextract.cache import InMemoryCache, make_cache_key
+from docextract.config import ExtractionConfig
+from docextract.example_schemas import INVOICE_SCHEMA
+from docextract.parser import INGESTION_HANDLERS, DocumentParser, register_default_ingestion_handler
+from docextract.schema import Field, Schema
 
 
 def test_cache_hit_avoids_second_llm_call():
@@ -22,7 +22,7 @@ def test_cache_hit_avoids_second_llm_call():
     cache = InMemoryCache()
     parser = DocumentParser(client=mock_client, cache=cache)
 
-    with patch("parser.extract_text_from_pdf", return_value="Total amount is 15.00 for this bill."):
+    with patch("docextract.parser.extract_text_from_pdf", return_value="Total amount is 15.00 for this bill."):
         first = parser.extract(b"dummy-doc", schema)
         second = parser.extract(b"dummy-doc", schema)
 
@@ -41,7 +41,7 @@ def test_cache_is_skipped_when_custom_rules_passed():
     def noop_rule(extracted):
         return None
 
-    with patch("parser.extract_text_from_pdf", return_value="Total amount is 15.00 for this bill."):
+    with patch("docextract.parser.extract_text_from_pdf", return_value="Total amount is 15.00 for this bill."):
         parser.extract(b"dummy-doc", schema, rules=[noop_rule])
         parser.extract(b"dummy-doc", schema, rules=[noop_rule])
 
@@ -78,7 +78,7 @@ def test_cache_key_differs_by_handler_identity():
 
 
 def test_unknown_kind_raises_dedicated_error_not_bare_valueerror():
-    from parser import UnknownIngestionKindError
+    from docextract.parser import UnknownIngestionKindError
 
     schema = Schema(name="T", fields=[Field(name="x", description="x")])
     mock_client = MagicMock()
@@ -104,9 +104,9 @@ def test_concurrent_chunks_produce_same_result_as_sequential():
     mock_client_par.extract.side_effect = fake_extract
     parser_par = DocumentParser(client=mock_client_par, config=ExtractionConfig(max_concurrent_chunks=4))
 
-    with patch("parser.chunk_document_text", return_value=chunks), \
-         patch("parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy"), \
-         patch("parser.pymupdf.open"):
+    with patch("docextract.parser.chunk_document_text", return_value=chunks), \
+         patch("docextract.parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy"), \
+         patch("docextract.parser.pymupdf.open"):
         result_seq = parser_seq.extract(b"dummy", schema)
         result_par = parser_par.extract(b"dummy", schema)
 
@@ -122,9 +122,9 @@ def test_merge_prefers_chunk_grounded_value_over_hallucinated_first_chunk():
     mock_client.extract.side_effect = ['{"total": 999.0}', '{"total": 100.0}']
     parser = DocumentParser(client=mock_client)
 
-    with patch("parser.chunk_document_text", return_value=["unrelated filler text", "Grand Total: 100.0"]), \
-         patch("parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy"), \
-         patch("parser.pymupdf.open"):
+    with patch("docextract.parser.chunk_document_text", return_value=["unrelated filler text", "Grand Total: 100.0"]), \
+         patch("docextract.parser.extract_text_from_pdf", return_value="dummy dummy dummy dummy dummy dummy dummy dummy"), \
+         patch("docextract.parser.pymupdf.open"):
         res = parser.extract(b"dummy", schema)
 
     assert res["total"]["value"] == 100.0
@@ -215,7 +215,7 @@ def test_extraction_config_is_frozen():
 
 
 def test_extraction_result_from_raw_requires_meta():
-    from result import ExtractionResult
+    from docextract.result import ExtractionResult
 
     with pytest.raises(ValueError):
         ExtractionResult.from_raw({"total": {"value": 1, "confidence": "high", "flags": []}})
@@ -227,7 +227,7 @@ def test_aextract_matches_sync_extract():
     mock_client.extract.return_value = '{"total": 100.0}'
     parser = DocumentParser(client=mock_client)
 
-    with patch("parser.extract_text_from_pdf", return_value="Grand Total: 100.0. Padding to skip OCR fallback."):
+    with patch("docextract.parser.extract_text_from_pdf", return_value="Grand Total: 100.0. Padding to skip OCR fallback."):
         sync_result = parser.extract(b"dummy", schema)
         async_result = asyncio.run(parser.aextract(b"dummy", schema))
 
