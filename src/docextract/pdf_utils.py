@@ -4,13 +4,25 @@ from __future__ import annotations
 
 import io
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import pymupdf  # PyMuPDF
 from PIL import Image
 
 # Rendering constants
 PDF_RENDER_DPI = 150
+
+
+def _safe_open_pdf(pdf_bytes: bytes) -> Optional["pymupdf.Document"]:
+    """pymupdf.open() raises pymupdf.FileDataError/EmptyFileError (both RuntimeError
+    subclasses, not ValueError) on corrupt or non-PDF bytes — a raw file upload gone
+    wrong is an expected, common failure mode here, not a programming error, so it
+    shouldn't propagate as an unhandled crash. Returns None on failure; callers treat
+    that the same as "no text found," which the rest of the pipeline already handles."""
+    try:
+        return pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    except Exception:
+        return None
 
 
 @dataclass
@@ -28,7 +40,9 @@ def pdf_to_page_images(pdf_bytes: bytes, max_pages: int = 3, dpi: int = PDF_REND
     Returns a list of PageImage in page order.
     """
     pages: List[PageImage] = []
-    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    doc = _safe_open_pdf(pdf_bytes)
+    if doc is None:
+        return pages
     try:
         zoom = dpi / 72.0  # 72 DPI is the PDF default
         matrix = pymupdf.Matrix(zoom, zoom)
@@ -113,8 +127,10 @@ def _bbox_overlaps(b1: Tuple[float, float, float, float], b2: Tuple[float, float
 
 def extract_layout_markdown_from_pdf(pdf_bytes: bytes, max_pages: int = 15, structured_mode: bool = False) -> str:
     """Phase 1 Engine: Extract digital PDF into layout-preserved Markdown text."""
-    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    doc = _safe_open_pdf(pdf_bytes)
     pages_md: List[str] = []
+    if doc is None:
+        return ""
     try:
         for i in range(min(len(doc), max_pages)):
             page = doc[i]
@@ -171,8 +187,10 @@ def extract_text_from_pdf(pdf_bytes: bytes, max_pages: int = 15, structured_mode
         return layout_md
     
     # Fallback to plain text
-    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    doc = _safe_open_pdf(pdf_bytes)
     texts: List[str] = []
+    if doc is None:
+        return ""
     try:
         for i in range(min(len(doc), max_pages)):
             page_text = doc[i].get_text("text")
@@ -185,7 +203,9 @@ def extract_text_from_pdf(pdf_bytes: bytes, max_pages: int = 15, structured_mode
 
 def is_digital_pdf(pdf_bytes: bytes, min_chars: int = 80) -> bool:
     """Return True if the PDF has a readable text layer (i.e. is not a scan)."""
-    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    doc = _safe_open_pdf(pdf_bytes)
+    if doc is None:
+        return False
     total_chars = 0
     try:
         for i in range(min(len(doc), 3)):
@@ -215,15 +235,28 @@ def chunk_document_text(text: str, max_tokens: int = 3000) -> List[str]:
 
     chunks = []
     current_chunk = ""
-    
+
     for pt in page_texts:
         if len(current_chunk) + len(pt) > max_chars and current_chunk:
             chunks.append(current_chunk.strip())
             current_chunk = pt
         else:
             current_chunk += "\n\n" + pt if current_chunk else pt
-            
+
     if current_chunk:
         chunks.append(current_chunk.strip())
-        
-    return chunks
+
+    # A single page (or a document with no "--- PAGE" delimiters at all) can itself
+    # exceed max_chars — the loop above only splits *between* pages, so that chunk
+    # would otherwise sail past the configured budget by an arbitrary amount. Hard-split
+    # anything still oversized; a mid-sentence cut here is far better than silently
+    # blowing an LLM's context window.
+    final_chunks = []
+    for chunk in chunks:
+        if len(chunk) <= max_chars:
+            final_chunks.append(chunk)
+        else:
+            for start in range(0, len(chunk), max_chars):
+                final_chunks.append(chunk[start:start + max_chars])
+
+    return final_chunks

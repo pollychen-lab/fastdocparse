@@ -6,7 +6,7 @@ single source of truth; editing it updates both the CLI template and this import
 
 from pathlib import Path
 
-from schema import Schema
+from .schema import Schema
 
 _SCHEMAS_DIR = Path(__file__).parent / "schemas"
 

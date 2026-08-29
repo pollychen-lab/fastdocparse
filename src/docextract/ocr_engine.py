@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import io
 import logging
 import threading
@@ -10,17 +11,35 @@ from PIL import Image
 
 logger = logging.getLogger(__name__)
 
-try:
-    from rapidocr_onnxruntime import RapidOCR
-    _rapid_ocr = RapidOCR()
-    HAS_RAPID_OCR = True
-except Exception:
-    logger.warning("RapidOCR unavailable; OCR extraction will return empty text.", exc_info=True)
-    _rapid_ocr = None
-    HAS_RAPID_OCR = False
+# Whether the package is installed at all — checked via find_spec, which locates the
+# module without executing it, so this costs nothing at import time. The actual
+# `import rapidocr_onnxruntime` (which pulls in onnxruntime, opencv, numpy — measured
+# at ~1.2s) and RapidOCR() construction only happen lazily, on first real OCR call, via
+# _get_rapid_ocr() below. Without this, every `import docextract` would eagerly pay
+# that cost even for code that never touches OCR (e.g. just building a Schema).
+HAS_RAPID_OCR = importlib.util.find_spec("rapidocr_onnxruntime") is not None
 
-# The RapidOCR/onnxruntime session is a shared module-level singleton; serialize
-# calls so concurrent requests (e.g. behind a web server) don't race on it.
+_rapid_ocr = None
+_init_lock = threading.Lock()
+_init_failed = False
+
+
+def _get_rapid_ocr():
+    global _rapid_ocr, _init_failed
+    if _rapid_ocr is not None or _init_failed:
+        return _rapid_ocr
+    with _init_lock:
+        if _rapid_ocr is not None or _init_failed:
+            return _rapid_ocr
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+            _rapid_ocr = RapidOCR()
+        except Exception:
+            logger.warning("RapidOCR failed to initialize; OCR extraction will return empty text.", exc_info=True)
+            _init_failed = True
+    return _rapid_ocr
+
+
 _ocr_lock = threading.Lock()
 
 
@@ -29,19 +48,23 @@ def extract_text_from_image_ocr(image_bytes: bytes, structured_mode: bool = Fals
 
     Returns a clean, line-grouped text representation preserving horizontal spacing.
     """
-    if not HAS_RAPID_OCR or _rapid_ocr is None:
+    if not HAS_RAPID_OCR:
+        return ""
+
+    rapid_ocr = _get_rapid_ocr()
+    if rapid_ocr is None:
         return ""
 
     try:
         img = Image.open(io.BytesIO(image_bytes))
         if img.mode != "RGB":
             img = img.convert("RGB")
-        
+
         buf = io.BytesIO()
         img.save(buf, format="JPEG")
-        
+
         with _ocr_lock:
-            result, _ = _rapid_ocr(buf.getvalue())
+            result, _ = rapid_ocr(buf.getvalue())
         if not result:
             return ""
 

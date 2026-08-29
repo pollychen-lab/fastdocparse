@@ -10,8 +10,8 @@ import json
 from collections import OrderedDict
 from typing import Any, Callable, Dict, Optional, Protocol
 
-from config import ExtractionConfig
-from schema import Schema
+from .config import ExtractionConfig
+from .schema import Schema
 
 
 class Cache(Protocol):

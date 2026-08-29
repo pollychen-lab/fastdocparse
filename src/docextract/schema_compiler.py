@@ -14,9 +14,9 @@ an authoring aid with a human in the loop, not a fully implicit step.
 
 from typing import Any, Dict
 
-from json_repair import parse_json_from_llm
-from llm_client import LLMClient
-from schema import Schema
+from .json_repair import parse_json_from_llm
+from .llm_client import LLMClient
+from .schema import Schema
 
 SCHEMA_GEN_PROMPT = """You are a data schema designer. A user described, in plain language, what \
 information they want extracted from a document. Convert their description into a JSON schema.

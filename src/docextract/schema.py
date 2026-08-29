@@ -22,12 +22,29 @@ class Field(BaseModel):
         rather than exact string match (see grounding.check_substring's numeric= flag)."""
         return self.type in ("number", "currency")
 
+    @property
+    def is_date(self) -> bool:
+        """True for date fields — grounded by parsed calendar date rather than exact
+        string match (see grounding.check_substring's date= flag), since a normalized
+        "2021-04-22" won't literally appear in a source document that says "22Apr2021"."""
+        return self.type == "date"
+
 
 class Schema(BaseModel):
     """Defines a complete document schema."""
     name: str = "DocumentSchema"
     fields: List[Field]
     examples: Optional[List[Tuple[str, Dict[str, Any]]]] = None
+
+    @field_validator('fields')
+    @classmethod
+    def validate_field_names(cls, v):
+        if any(f.name == "_meta" for f in v):
+            raise ValueError(
+                "'_meta' is a reserved field name (used for truncation metadata in the "
+                "extraction result) and cannot be used as a schema field name."
+            )
+        return v
 
     @field_validator('examples')
     @classmethod

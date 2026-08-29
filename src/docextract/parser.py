@@ -3,26 +3,40 @@
 import asyncio
 import functools
 import logging
+import re
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional
 
 import pymupdf
 
-from cache import Cache, make_cache_key
-from config import ExtractionConfig
-from grounding import Issue, check_substring, cross_check, validate_field_constraints
-from json_repair import parse_json_from_llm as _parse_json_from_llm
-from llm_client import LLMClient
-from ocr_engine import extract_text_from_image_ocr
-from pdf_utils import chunk_document_text, extract_text_from_pdf, pdf_to_page_images
-from prompt_compiler import compile_prompt
-from schema import Schema
+from .cache import Cache, make_cache_key
+from .config import ExtractionConfig
+from .grounding import Issue, _is_present, check_substring, cross_check, validate_field_constraints
+from .json_repair import parse_json_from_llm as _parse_json_from_llm
+from .llm_client import LLMClient
+from .ocr_engine import extract_text_from_image_ocr
+from .pdf_utils import chunk_document_text, extract_text_from_pdf, pdf_to_page_images
+from .prompt_compiler import compile_prompt
+from .schema import Schema
 
 logger = logging.getLogger(__name__)
 
 
 class EmptyDocumentError(ValueError):
     """Raised when no text could be extracted from a document by any route."""
+
+
+_LAYOUT_TAG_RE = re.compile(r"\[X:\d+\]\s*")
+
+
+def _strip_layout_tags(text: str) -> str:
+    """Remove the "[X:nnn]" column-position markers structured_mode adds for the LLM's
+    benefit before running any grounding check against the text. Those digits are pixel
+    coordinates, not document content — left in, they can splice into the middle of a
+    real value's character stream (e.g. an address split across OCR lines) and break a
+    fuzzy match that would otherwise succeed, flagging a correct value as ungrounded.
+    """
+    return _LAYOUT_TAG_RE.sub("", text)
 
 
 class UnknownIngestionKindError(ValueError):
@@ -59,16 +73,17 @@ def _merge_extracted_data(results: List[Dict[str, Any]], chunks: List[str], sche
                     merged[f.name].extend(val)
             continue
 
-        is_numeric = f.is_numeric
         first_non_null = None
         grounded_value = None
         for res, chunk_text in zip(results, chunks):
             val = res.get(f.name)
-            if val is None:
+            if not _is_present(val):
                 continue
             if first_non_null is None:
                 first_non_null = val
-            if grounded_value is None and check_substring(val, chunk_text, numeric=is_numeric):
+            if grounded_value is None and check_substring(
+                val, _strip_layout_tags(chunk_text), numeric=f.is_numeric, date=f.is_date
+            ):
                 grounded_value = val
                 break
         merged[f.name] = grounded_value if grounded_value is not None else first_non_null
@@ -271,13 +286,14 @@ class DocumentParser:
                 "truncation_reason": truncation_reason,
             }
         }
+        grounding_text = _strip_layout_tags(doc_text)
         for f in schema.fields:
             value = merged_data.get(f.name, None)
             flags = []
             confidence = "low"
 
-            if value is not None:
-                if check_substring(value, doc_text, numeric=f.is_numeric):
+            if _is_present(value):
+                if check_substring(value, grounding_text, numeric=f.is_numeric, date=f.is_date):
                     flags.append("grounded")
                     confidence = "high"
                 else:

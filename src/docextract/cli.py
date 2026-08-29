@@ -1,8 +1,8 @@
 """Command-line entrypoint: extract fields from a document without writing code.
 
 Usage:
-    python cli.py extract document.pdf schemas/invoice.json
-    python cli.py extract receipt.jpg schemas/shipment_manifest.json --model llama3 --base-url http://localhost:11434/v1
+    docextract extract document.pdf invoice_schema.json
+    docextract extract receipt.jpg shipment_schema.json --model llama3 --base-url http://localhost:11434/v1
 """
 
 import importlib
@@ -14,10 +14,10 @@ from typing import Optional
 import typer
 from pydantic import ValidationError
 
-from llm_client import LLMClient, LLMClientError
-from parser import DocumentParser, EmptyDocumentError, UnknownIngestionKindError
-from schema import Schema
-from schema_compiler import compile_schema_from_description
+from .llm_client import LLMClient, LLMClientError
+from .parser import DocumentParser, EmptyDocumentError, UnknownIngestionKindError
+from .schema import Schema
+from .schema_compiler import compile_schema_from_description
 
 
 def _load_plugins() -> None:
@@ -133,7 +133,7 @@ def schema_from_text(
         raise typer.Exit(code=1)
 
     typer.echo(f"Saved schema '{doc_schema.name}' with {len(doc_schema.fields)} field(s) to {output}")
-    typer.echo("Review it, then run: python cli.py extract <your_document> " + str(output))
+    typer.echo("Review it, then run: docextract extract <your_document> " + str(output))
 
 
 if __name__ == "__main__":

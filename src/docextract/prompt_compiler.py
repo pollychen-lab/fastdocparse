@@ -2,7 +2,7 @@
 
 import json
 from typing import Any, Dict
-from schema import Schema, Field
+from .schema import Schema, Field
 
 def _generate_json_structure(fields: list[Field]) -> Dict[str, Any]:
     """Generate a sample JSON structure representing the schema."""
