@@ -1,0 +1,73 @@
+{
+  "name": "Invoice",
+  "fields": [
+    {
+      "name": "invoice_number",
+      "description": "Invoice No / Bill No / Reference number.",
+      "required": true
+    },
+    {
+      "name": "invoice_date",
+      "description": "YYYY-MM-DD format.",
+      "type": "date"
+    },
+    {
+      "name": "exporter_name",
+      "description": "Full name of the seller/exporter/supplier issuing the invoice. Look for company name at the top left, letterhead, or footer signature block."
+    },
+    {
+      "name": "exporter_address",
+      "description": "Complete address of the exporter (combine all address lines with comma separators)."
+    },
+    {
+      "name": "importer_name",
+      "description": "Full name of the buyer/consignee/importer. Look for 'Consignee', 'Bill To', 'Buyer', 'Importer', 'Ship To'."
+    },
+    {
+      "name": "importer_address",
+      "description": "Complete address of the importer/consignee (combine all address lines)."
+    },
+    {
+      "name": "currency",
+      "description": "3-letter ISO code (USD, EUR, GBP, INR, etc.).",
+      "enum": ["USD", "EUR", "GBP", "INR", "JPY", "CNY"]
+    },
+    {
+      "name": "total_price",
+      "description": "Final grand total invoice amount due (numeric only).",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "line_items",
+      "description": "Every product row.",
+      "type": "list",
+      "sub_fields": [
+        { "name": "product_name", "description": "Name of the product" },
+        { "name": "product_description", "description": "Description of the product" },
+        { "name": "hs_code", "description": "HSN/HS code" },
+        { "name": "unit_price", "description": "Price per unit" },
+        { "name": "quantity", "description": "Quantity" }
+      ]
+    }
+  ],
+  "examples": [
+    [
+      "GLOBAL EXPORTS INC.\n123 Market St, San Francisco, CA 94105, USA\n\nBILL TO:\nAcme Corp\n456 Industrial Way, Seattle, WA 98101\n\nInvoice: INV-9011\nDate: 04/15/2023\n\nItem\tQty\tPrice\tTotal\nWidget A\t10\t$5.00\t$50.00\nSuper Widget\t2\t$25.00\t$50.00\n\nGrand Total: USD 100.00",
+      {
+        "invoice_number": "INV-9011",
+        "invoice_date": "2023-04-15",
+        "exporter_name": "GLOBAL EXPORTS INC.",
+        "exporter_address": "123 Market St, San Francisco, CA 94105, USA",
+        "importer_name": "Acme Corp",
+        "importer_address": "456 Industrial Way, Seattle, WA 98101",
+        "currency": "USD",
+        "total_price": 100.0,
+        "line_items": [
+          { "product_name": "Widget A", "product_description": "Widget A", "hs_code": null, "unit_price": 5.0, "quantity": 10 },
+          { "product_name": "Super Widget", "product_description": "Super Widget", "hs_code": null, "unit_price": 25.0, "quantity": 2 }
+        ]
+      }
+    ]
+  ]
+}

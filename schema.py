@@ -1,0 +1,77 @@
+"""Schema definitions for document extraction."""
+
+import json
+from pathlib import Path
+from typing import List, Optional, Tuple, Dict, Any, Union
+from pydantic import BaseModel, field_validator
+
+
+class Field(BaseModel):
+    """Defines a single field to extract from a document."""
+    name: str
+    description: str
+    type: str = "text"  # "text", "number", "date", "currency", "list"
+    required: bool = False
+    pattern: Optional[str] = None  # regex the extracted string value must fully match, e.g. HS/container codes
+    enum: Optional[List[str]] = None  # allowed values, e.g. shipment status, incoterms
+    sub_fields: Optional[List['Field']] = None
+
+    @property
+    def is_numeric(self) -> bool:
+        """True for field types that should be grounded/merged by parsed numeric value
+        rather than exact string match (see grounding.check_substring's numeric= flag)."""
+        return self.type in ("number", "currency")
+
+
+class Schema(BaseModel):
+    """Defines a complete document schema."""
+    name: str = "DocumentSchema"
+    fields: List[Field]
+    examples: Optional[List[Tuple[str, Dict[str, Any]]]] = None
+
+    @field_validator('examples')
+    @classmethod
+    def validate_examples(cls, v):
+        if v is not None:
+            for ex in v:
+                if not isinstance(ex, tuple) or len(ex) != 2:
+                    raise ValueError("Each example must be a tuple of (document_snippet, expected_json)")
+                if not isinstance(ex[0], str) or not isinstance(ex[1], dict):
+                    raise ValueError("Each example must be a tuple of (str, dict)")
+        return v
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Schema":
+        """Build a Schema from a plain dict (as loaded from JSON/YAML) — no Python code needed."""
+        return cls.model_validate(data)
+
+    @classmethod
+    def from_json(cls, path: Union[str, Path]) -> "Schema":
+        """Load a Schema from a .json file."""
+        with open(path, "r") as f:
+            return cls.from_dict(json.load(f))
+
+    @classmethod
+    def from_yaml(cls, path: Union[str, Path]) -> "Schema":
+        """Load a Schema from a .yaml/.yml file."""
+        import yaml  # optional dependency; only needed for this path
+
+        with open(path, "r") as f:
+            return cls.from_dict(yaml.safe_load(f))
+
+    @classmethod
+    def from_file(cls, path: Union[str, Path]) -> "Schema":
+        """Load a Schema from a .json or .yaml/.yml file, dispatching on extension."""
+        path = Path(path)
+        suffix = path.suffix.lower()
+        if suffix in (".yaml", ".yml"):
+            return cls.from_yaml(path)
+        if suffix == ".json":
+            return cls.from_json(path)
+        raise ValueError(f"Unsupported schema file extension {suffix!r} (expected .json, .yaml, or .yml)")
+
+    def get_field(self, name: str) -> Optional[Field]:
+        for f in self.fields:
+            if f.name == name:
+                return f
+        return None

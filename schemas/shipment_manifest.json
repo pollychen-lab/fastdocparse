@@ -1,0 +1,40 @@
+{
+  "name": "ShipmentManifest",
+  "fields": [
+    {
+      "name": "bill_of_lading",
+      "description": "Bill of Lading (B/L) number identifying the shipment.",
+      "required": true,
+      "pattern": "BL-\\d{4,}"
+    },
+    {
+      "name": "container_number",
+      "description": "Shipping container number, ISO 6346 format (4 letters + 7 digits).",
+      "pattern": "[A-Z]{4}\\d{7}"
+    },
+    {
+      "name": "hs_code",
+      "description": "Harmonized System code for the primary goods.",
+      "pattern": "\\d{6,10}"
+    },
+    {
+      "name": "shipment_status",
+      "description": "Current status of the shipment.",
+      "enum": ["in_transit", "delivered", "customs_hold", "delayed"]
+    },
+    {
+      "name": "origin_port",
+      "description": "Port or place of loading."
+    },
+    {
+      "name": "destination_country",
+      "description": "Country of final destination.",
+      "required": true
+    },
+    {
+      "name": "gross_weight_kg",
+      "description": "Total gross weight in kilograms (numeric only).",
+      "type": "number"
+    }
+  ]
+}

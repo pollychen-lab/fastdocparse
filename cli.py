@@ -1,0 +1,140 @@
+"""Command-line entrypoint: extract fields from a document without writing code.
+
+Usage:
+    python cli.py extract document.pdf schemas/invoice.json
+    python cli.py extract receipt.jpg schemas/shipment_manifest.json --model llama3 --base-url http://localhost:11434/v1
+"""
+
+import importlib
+import json
+import os
+from pathlib import Path
+from typing import Optional
+
+import typer
+from pydantic import ValidationError
+
+from llm_client import LLMClient, LLMClientError
+from parser import DocumentParser, EmptyDocumentError, UnknownIngestionKindError
+from schema import Schema
+from schema_compiler import compile_schema_from_description
+
+
+def _load_plugins() -> None:
+    """Import modules listed in DOCEXTRACT_PLUGINS (comma-separated) so they can call
+    parser.register_default_ingestion_handler() on import — the only way a custom
+    ingestion kind (DOCX, XLSX, ...) becomes reachable from this CLI, since a fresh CLI
+    process otherwise only knows the built-in "pdf"/"image" handlers.
+
+    Security note: this imports and runs arbitrary Python from wherever DOCEXTRACT_PLUGINS
+    points, at CLI startup, with no sandboxing — the same trust model as PYTHONSTARTUP or
+    DJANGO_SETTINGS_MODULE. That's fine for a user pointing it at their own plugin on their
+    own machine, which is the only supported use. Never let this env var be set from an
+    untrusted source (e.g. a request parameter in a hosted service built on this CLI).
+    """
+    plugin_spec = os.environ.get("DOCEXTRACT_PLUGINS", "")
+    for module_name in filter(None, (p.strip() for p in plugin_spec.split(","))):
+        importlib.import_module(module_name)
+
+
+_load_plugins()
+
+app = typer.Typer(
+    add_completion=False,
+    help="Extract structured data from a PDF/PNG/JPG using a schema file you define — no coding required.",
+)
+
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
+SUPPORTED_EXTENSIONS = IMAGE_EXTENSIONS | {".pdf"}
+
+
+@app.command()
+def extract(
+    file: Path = typer.Argument(..., exists=True, readable=True, help="Path to the PDF/PNG/JPG document."),
+    schema: Path = typer.Argument(..., exists=True, readable=True, help="Path to a .json or .yaml schema file listing the fields to extract."),
+    model: str = typer.Option("gpt-4o-mini", "--model", "-m", help="Model name, e.g. gpt-4o-mini, llama3."),
+    base_url: Optional[str] = typer.Option(None, "--base-url", help="OpenAI-compatible API base URL. Omit for OpenAI; use e.g. http://localhost:11434/v1 for Ollama."),
+    api_key: Optional[str] = typer.Option(None, "--api-key", envvar="LLM_API_KEY", help="API key. Not needed for local Ollama."),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Write the JSON result to this file instead of printing it."),
+    kind: Optional[str] = typer.Option(None, "--kind", help="Override ingestion routing (e.g. 'docx' for a custom handler loaded via DOCEXTRACT_PLUGINS). Defaults to auto-detecting pdf/image from the file extension."),
+):
+    """Extract the fields defined in SCHEMA from FILE and print the result as JSON."""
+    if kind is None and file.suffix.lower() not in SUPPORTED_EXTENSIONS:
+        typer.echo(f"Unsupported file type {file.suffix!r}. Supported: .pdf, .png, .jpg, .jpeg (or pass --kind).", err=True)
+        raise typer.Exit(code=1)
+
+    try:
+        doc_schema = Schema.from_file(schema)
+    except (ValidationError, ValueError, OSError) as e:
+        typer.echo(f"Could not load schema from {schema}: {e}", err=True)
+        raise typer.Exit(code=1)
+
+    client = LLMClient(base_url=base_url, api_key=api_key, model=model)
+    document_parser = DocumentParser(client=client)
+
+    is_image = file.suffix.lower() in IMAGE_EXTENSIONS
+    document_bytes = file.read_bytes()
+
+    try:
+        result = document_parser.extract(document_bytes, doc_schema, is_image=is_image, kind=kind)
+    except EmptyDocumentError as e:
+        typer.echo(f"Extraction failed: {e}", err=True)
+        raise typer.Exit(code=1)
+    except LLMClientError as e:
+        typer.echo(f"Could not complete extraction: {e}", err=True)
+        raise typer.Exit(code=1)
+    except UnknownIngestionKindError as e:
+        typer.echo(f"{e} (check --kind is spelled correctly and its plugin is loaded via DOCEXTRACT_PLUGINS)", err=True)
+        raise typer.Exit(code=1)
+    except ValueError as e:
+        typer.echo(f"Extraction failed: {e}", err=True)
+        raise typer.Exit(code=1)
+
+    result_json = json.dumps(result, indent=2, default=str)
+
+    if output:
+        try:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(result_json)
+        except OSError as e:
+            typer.echo(f"Could not write output to {output}: {e}", err=True)
+            raise typer.Exit(code=1)
+        typer.echo(f"Wrote result to {output}")
+    else:
+        typer.echo(result_json)
+
+
+@app.command(name="schema-from-text")
+def schema_from_text(
+    description: str = typer.Argument(..., help="Plain-English description of the fields you want extracted, e.g. \"invoice number, total price, and a list of line items with product name and quantity\"."),
+    output: Path = typer.Option(..., "--output", "-o", help="Where to save the generated schema (.json)."),
+    model: str = typer.Option("gpt-4o-mini", "--model", "-m", help="Model name, e.g. gpt-4o-mini, llama3."),
+    base_url: Optional[str] = typer.Option(None, "--base-url", help="OpenAI-compatible API base URL. Omit for OpenAI; use e.g. http://localhost:11434/v1 for Ollama."),
+    api_key: Optional[str] = typer.Option(None, "--api-key", envvar="LLM_API_KEY", help="API key. Not needed for local Ollama."),
+):
+    """Turn a plain-English description of the fields you want into a schema file.
+
+    Review the generated file before using it with `extract` — the LLM proposes field
+    names and types from your description, and a wrong guess here affects every
+    document you later run against this schema.
+    """
+    client = LLMClient(base_url=base_url, api_key=api_key, model=model)
+    try:
+        doc_schema = compile_schema_from_description(description, client)
+    except (ValueError, LLMClientError) as e:
+        typer.echo(f"Could not generate a schema: {e}", err=True)
+        raise typer.Exit(code=1)
+
+    try:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(doc_schema.model_dump(), indent=2))
+    except OSError as e:
+        typer.echo(f"Could not write schema to {output}: {e}", err=True)
+        raise typer.Exit(code=1)
+
+    typer.echo(f"Saved schema '{doc_schema.name}' with {len(doc_schema.fields)} field(s) to {output}")
+    typer.echo("Review it, then run: python cli.py extract <your_document> " + str(output))
+
+
+if __name__ == "__main__":
+    app()
