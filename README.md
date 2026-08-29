@@ -28,14 +28,20 @@ Defining *what* to extract also has two paths — hand-write a JSON/YAML schema 
 ## Install
 
 ```bash
-git clone <this repo>
+pip install fastdocparse
+```
+
+(That's the PyPI distribution name — it was the closest available name once `docextract` turned out to collide with an existing project. The import name, the CLI command, and everything else stay `docextract`: `from docextract import ...`, `docextract extract ...`.)
+
+For local development instead:
+
+```bash
+git clone https://github.com/pranjalparmar/docextract
 cd document-extractor
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -e .
+pip install -e ".[dev]"
 ```
-
-(Not yet published to PyPI — see [Status](#status). Until then, install from a local clone as above.)
 
 You also need access to an LLM. Either:
 - An OpenAI API key (`export OPENAI_API_KEY=...` or pass `--api-key`), or
@@ -110,4 +116,4 @@ Want to contribute? Start with [docs/architecture.md](docs/architecture.md) for 
 
 ## Status
 
-Core extraction, grounding, chunking, both CLI/API paths, and real packaging (`pip install -e .` installs a working `docextract` command and a proper `docextract.*` import namespace — verified with a from-scratch build and a clean-virtualenv install) are implemented and tested (74 tests, `pytest -v`). Not yet done: actually publishing to PyPI and a hosted API — see [document-extractor-spec.md](document-extractor-spec.md) for the roadmap.
+Core extraction, grounding, chunking, both CLI/API paths, and real packaging are implemented and tested (74 tests, `pytest -v`). Published on PyPI as [`fastdocparse`](https://pypi.org/project/fastdocparse/) — `pip install fastdocparse` installs a working `docextract` command and a proper `docextract.*` import namespace, verified end to end with a clean-virtualenv install straight from the real public index. Not yet done: a hosted API — see [document-extractor-spec.md](document-extractor-spec.md) for the roadmap.

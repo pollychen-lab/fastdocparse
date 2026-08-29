@@ -19,7 +19,11 @@ from .schema_compiler import compile_schema_from_description
 
 try:
     from importlib.metadata import version as _pkg_version
-    __version__ = _pkg_version("docextract")
+    # Looks up by the PyPI *distribution* name, not the import name — these differ
+    # ("docextract" was blocked by PyPI's name-similarity rule against the existing
+    # "doc-extract", so the distribution is registered as "fastdocparse"). Keep this
+    # in sync with pyproject.toml's [project] name if that ever changes again.
+    __version__ = _pkg_version("fastdocparse")
 except Exception:
     __version__ = "0.0.0+unknown"
 
