@@ -146,13 +146,17 @@ def extract_layout_markdown_from_pdf(pdf_bytes: bytes, max_pages: int = 15, stru
             try:
                 tabs = page.find_tables()
                 for tab in tabs.tables:
-                    grid = tab.extract()
+                    try:
+                        grid = tab.extract()
+                    except (RuntimeError, TypeError, ValueError):
+                        logger.debug("Skipping failed PDF table extraction.", exc_info=True)
+                        continue
                     md = _grid_to_markdown(grid)
                     if md:
                         table_bboxes.append(tab.bbox)
                         table_markdowns.append((tab.bbox[1], md))
             except (RuntimeError, TypeError, ValueError):
-                logger.debug("Skipping failed PDF table extraction.", exc_info=True)
+                logger.debug("Skipping failed PDF table discovery.", exc_info=True)
 
             # 2. Extract text blocks outside tables
             blocks = page.get_text("blocks")
