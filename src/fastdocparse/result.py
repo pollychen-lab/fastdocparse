@@ -9,8 +9,9 @@ and validation instead of raw dict indexing:
     typed = ExtractionResult.from_raw(result)
     typed.fields["invoice_number"].value
 """
+from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -18,20 +19,20 @@ from pydantic import BaseModel
 class FieldResult(BaseModel):
     value: Any
     confidence: str
-    flags: List[str]
+    flags: list[str]
 
 
 class ExtractionMeta(BaseModel):
     truncated: bool
-    truncation_reason: Optional[str] = None
+    truncation_reason: str | None = None
 
 
 class ExtractionResult(BaseModel):
     meta: ExtractionMeta
-    fields: Dict[str, FieldResult]
+    fields: dict[str, FieldResult]
 
     @classmethod
-    def from_raw(cls, raw: Dict[str, Any]) -> "ExtractionResult":
+    def from_raw(cls, raw: dict[str, Any]) -> ExtractionResult:
         """Build a typed result from the dict returned by DocumentParser.extract()."""
         raw = dict(raw)
         meta = raw.pop("_meta", None)
