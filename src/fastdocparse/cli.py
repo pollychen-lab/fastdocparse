@@ -14,6 +14,7 @@ from pathlib import Path
 import typer
 from pydantic import ValidationError
 
+from . import __version__
 from .llm_client import LLMClient, LLMClientError
 from .parser import DocumentParser, EmptyDocumentError, UnknownIngestionKindError
 from .schema import Schema
@@ -46,6 +47,27 @@ app = typer.Typer(
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 SUPPORTED_EXTENSIONS = IMAGE_EXTENSIONS | {".pdf"}
+
+
+def _version_callback(value: bool) -> None:
+    if not value:
+        return
+
+    typer.echo(f"fastdocparse {__version__}")
+    raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show the version and exit.",
+    ),
+) -> None:
+    return None
 
 
 @app.command()

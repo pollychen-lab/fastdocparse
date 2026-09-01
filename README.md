@@ -33,7 +33,7 @@ No extra LLM call for any of this: it's deterministic, string/rule-based validat
 
 | | Who it's for | How |
 |---|---|---|
-| **CLI** | No coding needed | `fastdocparse extract <file> <schema.json>` |
+| **CLI** | No coding needed | `fastdocparse extract <file> <schema.json>` / `fastdocparse --version` |
 | **Python API** | Building it into your own app | `DocumentParser(client).extract(document_bytes, schema)` |
 
 Defining *what* to extract also has two paths: hand-write a JSON/YAML schema file, or describe it in plain English and let the LLM draft the schema for you.
