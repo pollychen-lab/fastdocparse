@@ -4,12 +4,12 @@ Usage:
     fastdocparse extract document.pdf invoice_schema.json
     fastdocparse extract receipt.jpg shipment_schema.json --model llama3 --base-url http://localhost:11434/v1
 """
+from __future__ import annotations
 
 import importlib
 import json
 import os
 from pathlib import Path
-from typing import Optional
 
 import typer
 from pydantic import ValidationError
@@ -53,10 +53,10 @@ def extract(
     file: Path = typer.Argument(..., exists=True, readable=True, help="Path to the PDF/PNG/JPG document."),
     schema: Path = typer.Argument(..., exists=True, readable=True, help="Path to a .json or .yaml schema file listing the fields to extract."),
     model: str = typer.Option("gpt-4o-mini", "--model", "-m", help="Model name, e.g. gpt-4o-mini, llama3."),
-    base_url: Optional[str] = typer.Option(None, "--base-url", help="OpenAI-compatible API base URL. Omit for OpenAI; use e.g. http://localhost:11434/v1 for Ollama."),
-    api_key: Optional[str] = typer.Option(None, "--api-key", envvar="LLM_API_KEY", help="API key. Not needed for local Ollama."),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Write the JSON result to this file instead of printing it."),
-    kind: Optional[str] = typer.Option(None, "--kind", help="Override ingestion routing (e.g. 'docx' for a custom handler loaded via FASTDOCPARSE_PLUGINS). Defaults to auto-detecting pdf/image from the file extension."),
+    base_url: str | None = typer.Option(None, "--base-url", help="OpenAI-compatible API base URL. Omit for OpenAI; use e.g. http://localhost:11434/v1 for Ollama."),
+    api_key: str | None = typer.Option(None, "--api-key", envvar="LLM_API_KEY", help="API key. Not needed for local Ollama."),
+    output: Path | None = typer.Option(None, "--output", "-o", help="Write the JSON result to this file instead of printing it."),
+    kind: str | None = typer.Option(None, "--kind", help="Override ingestion routing (e.g. 'docx' for a custom handler loaded via FASTDOCPARSE_PLUGINS). Defaults to auto-detecting pdf/image from the file extension."),
 ):
     """Extract the fields defined in SCHEMA from FILE and print the result as JSON."""
     if kind is None and file.suffix.lower() not in SUPPORTED_EXTENSIONS:
@@ -109,8 +109,8 @@ def schema_from_text(
     description: str = typer.Argument(..., help="Plain-English description of the fields you want extracted, e.g. \"invoice number, total price, and a list of line items with product name and quantity\"."),
     output: Path = typer.Option(..., "--output", "-o", help="Where to save the generated schema (.json)."),
     model: str = typer.Option("gpt-4o-mini", "--model", "-m", help="Model name, e.g. gpt-4o-mini, llama3."),
-    base_url: Optional[str] = typer.Option(None, "--base-url", help="OpenAI-compatible API base URL. Omit for OpenAI; use e.g. http://localhost:11434/v1 for Ollama."),
-    api_key: Optional[str] = typer.Option(None, "--api-key", envvar="LLM_API_KEY", help="API key. Not needed for local Ollama."),
+    base_url: str | None = typer.Option(None, "--base-url", help="OpenAI-compatible API base URL. Omit for OpenAI; use e.g. http://localhost:11434/v1 for Ollama."),
+    api_key: str | None = typer.Option(None, "--api-key", envvar="LLM_API_KEY", help="API key. Not needed for local Ollama."),
 ):
     """Turn a plain-English description of the fields you want into a schema file.
 
