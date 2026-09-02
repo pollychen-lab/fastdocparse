@@ -1,4 +1,6 @@
-# fastdocparse
+<h1 align="center">
+  <img src="https://raw.githubusercontent.com/pranjalparmar/fastdocparse/main/branding/fastdocparse_branding.png" alt="fastdocparse" width="600">
+</h1>
 
 [![PyPI](https://img.shields.io/pypi/v/fastdocparse.svg)](https://pypi.org/project/fastdocparse/)
 [![CI](https://github.com/pranjalparmar/fastdocparse/actions/workflows/ci.yml/badge.svg)](https://github.com/pranjalparmar/fastdocparse/actions/workflows/ci.yml)
