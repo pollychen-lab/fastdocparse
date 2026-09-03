@@ -253,6 +253,53 @@ def test_list_schemas_shows_bundled_schemas():
     assert "invoice" in result.output.lower()
 
 
+def test_list_schemas_describes_each_one():
+    """A bare path does not say which schema fits your document (#55)."""
+    result = runner.invoke(app, ["list-schemas"])
+
+    assert result.exit_code == 0
+    # The schema's own name, some of its field names, and how many there are.
+    assert "Invoice:" in result.output
+    assert "invoice_number" in result.output
+    assert "fields)" in result.output
+
+
+def test_list_schemas_names_files_not_absolute_paths_per_row():
+    """The directory is the same for every row; repeating it hid the useful part."""
+    result = runner.invoke(app, ["list-schemas"])
+    rows = [
+        line for line in result.output.splitlines()
+        if line.startswith("  ") and ".json" in line and "extract document.pdf" not in line
+    ]
+
+    assert rows, result.output
+    for row in rows:
+        assert row.strip().startswith(("invoice.json", "shipment_manifest.json")), row
+
+
+def test_list_schemas_still_prints_a_copyable_location():
+    """Dropping the path per row must not remove the reader's way to find them."""
+    result = runner.invoke(app, ["list-schemas"])
+
+    assert "They are in:" in result.output
+    assert "schemas" in result.output
+
+
+def test_list_schemas_field_count_matches_the_schema():
+    """The count is read from the file, not written down beside it."""
+    from pathlib import Path
+
+    from fastdocparse import cli
+    from fastdocparse.schema import Schema
+
+    bundled = Path(cli.__file__).parent / "schemas" / "invoice.json"
+    expected = len(Schema.from_file(bundled).fields)
+
+    result = runner.invoke(app, ["list-schemas"])
+
+    assert f"({expected} fields)" in result.output
+
+
 def test_validate_schema_valid_bundled():
     """validate-schema should successfully validate a bundled schema and report field count."""
     result = runner.invoke(app, ["validate-schema", str(INVOICE_SCHEMA_PATH)])
@@ -344,3 +391,21 @@ def test_extract_command_rejects_unreadable_schema_cleanly(tmp_path, monkeypatch
 
     assert result.exit_code != 0
     assert "readable" in result.output.lower()
+
+
+def test_extract_command_still_accepts_a_readable_schema(tmp_path):
+    """The control for the test above: the guard must fire on unreadability
+    specifically, not on every schema path handed to it. Without this, the
+    os.access patch above would pass just as happily against a check that
+    refused everything. Credit: PR #64 (dchaudhari7177)."""
+    schema_file = tmp_path / "fine.json"
+    schema_file.write_text('{"name": "T", "fields": [{"name": "x", "description": "x"}]}')
+
+    fake_result = json.dumps({"x": "value"})
+    with patch("fastdocparse.llm_client.OpenAI", return_value=_mock_openai_returning(fake_result)):
+        result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(schema_file), "--api-key", "test-key"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["x"]["value"] == "value"
+    assert "readable" not in result.output.lower()
