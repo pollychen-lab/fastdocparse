@@ -38,6 +38,12 @@ A schema is a JSON (or YAML) file listing the fields you want extracted. Two are
 
 Copy one and edit field names/descriptions for your document type, or write your own from scratch. See the [Schema Guide](schema-guide.md) for every option.
 
+Not sure what's bundled or where it lives? List them from the CLI:
+
+```bash
+fastdocparse list-schemas
+```
+
 **Don't want to write JSON at all?** Describe what you want in plain English:
 
 ```bash
@@ -69,12 +75,24 @@ Options:
 
 | Flag | Meaning | Default |
 |---|---|---|
-| `--model`, `-m` | Model name (`gpt-4o-mini`, `llama3.2`, ...) | `gpt-4o-mini` |
-| `--base-url` | OpenAI-compatible endpoint URL. Omit for real OpenAI. | OpenAI |
-| `--api-key` | API key. Can also be set via `LLM_API_KEY` env var. Any string works for local Ollama. | none |
+| `--model`, `-m` | Model name (`gpt-4o-mini`, `llama3.2`, ...). Also settable via `FASTDOCPARSE_MODEL`. | `gpt-4o-mini` |
+| `--base-url` | OpenAI-compatible endpoint URL. Omit for real OpenAI. Also settable via `FASTDOCPARSE_BASE_URL`. | OpenAI |
+| `--api-key` | API key. Also settable via `LLM_API_KEY` or `OPENAI_API_KEY`. Any string works for local Ollama. | none |
 | `--output`, `-o` | Save the JSON result to a file instead of printing it | stdout |
 
 PDF vs. image is detected automatically from the file extension.
+
+**Repeating `--model`/`--base-url`/`--api-key` on every command gets old fast if you're always using the same local model.** Set them once as environment variables instead:
+
+```bash
+export FASTDOCPARSE_MODEL=llama3.2
+export FASTDOCPARSE_BASE_URL=http://localhost:11434/v1
+export LLM_API_KEY=ollama
+
+fastdocparse extract document.pdf src/fastdocparse/schemas/invoice.json   # no flags needed
+```
+
+An explicit flag always overrides the matching env var, so you can still override per-command when needed. If nothing is configured at all (no flag, no env var, no `--base-url`), the CLI fails fast with setup instructions instead of trying to reach OpenAI and getting an auth error.
 
 ### A.3 Read the result
 

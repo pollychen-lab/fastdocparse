@@ -29,12 +29,82 @@ def test_extract_command_success():
         "currency": None, "total_price": None, "line_items": [],
     })
     with patch("fastdocparse.llm_client.OpenAI", return_value=_mock_openai_returning(fake_result)):
-        result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH)])
+        result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH), "--api-key", "test-key"])
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert payload["invoice_number"]["value"] == "INV-1"
     assert "_meta" in payload
+
+
+def test_extract_command_no_credentials_shows_friendly_message():
+    """No --api-key, no --base-url, and no relevant env vars set: should fail fast with
+    setup guidance instead of reaching the network and getting an OpenAI auth error."""
+    result = runner.invoke(
+        app,
+        ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH)],
+        env={"LLM_API_KEY": "", "OPENAI_API_KEY": "", "FASTDOCPARSE_BASE_URL": ""},
+    )
+
+    assert result.exit_code == 1
+    assert "no LLM credentials configured" in result.output
+    assert "OPENAI_API_KEY" in result.output
+    assert "--base-url" in result.output
+
+
+def test_extract_command_treats_blank_env_var_as_absent():
+    """A blank/empty env var (e.g. LLM_API_KEY="") must still trigger the friendly
+    credentials message, not silently bypass it into LLMClient's dummy-key fallback."""
+    result = runner.invoke(
+        app,
+        ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH)],
+        env={"LLM_API_KEY": "   ", "OPENAI_API_KEY": "", "FASTDOCPARSE_BASE_URL": ""},
+    )
+
+    assert result.exit_code == 1
+    assert "no LLM credentials configured" in result.output
+
+
+def test_extract_command_accepts_openai_api_key_env_var():
+    """README documents `export OPENAI_API_KEY=...` as valid setup; the --api-key
+    option must actually read it, not just the fastdocparse-specific LLM_API_KEY."""
+    fake_result = json.dumps({
+        "invoice_number": "INV-1", "invoice_date": None, "exporter_name": None,
+        "exporter_address": None, "importer_name": None, "importer_address": None,
+        "currency": None, "total_price": None, "line_items": [],
+    })
+    with patch("fastdocparse.llm_client.OpenAI", return_value=_mock_openai_returning(fake_result)):
+        result = runner.invoke(
+            app,
+            ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH)],
+            env={"OPENAI_API_KEY": "sk-from-env"},
+        )
+
+    assert result.exit_code == 0
+
+
+def test_extract_command_accepts_model_and_base_url_env_vars():
+    """FASTDOCPARSE_MODEL / FASTDOCPARSE_BASE_URL should work as flag-free config for
+    local-model users who don't want to repeat --model/--base-url on every command."""
+    fake_result = json.dumps({
+        "invoice_number": "INV-1", "invoice_date": None, "exporter_name": None,
+        "exporter_address": None, "importer_name": None, "importer_address": None,
+        "currency": None, "total_price": None, "line_items": [],
+    })
+    with patch("fastdocparse.llm_client.OpenAI", return_value=_mock_openai_returning(fake_result)) as mock_openai:
+        result = runner.invoke(
+            app,
+            ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH)],
+            env={
+                "FASTDOCPARSE_MODEL": "llama3.2",
+                "FASTDOCPARSE_BASE_URL": "http://localhost:11434/v1",
+                "LLM_API_KEY": "ollama",
+            },
+        )
+
+    assert result.exit_code == 0
+    mock_openai.assert_called_once_with(base_url="http://localhost:11434/v1", api_key="ollama", timeout=60.0)
+    assert mock_openai.return_value.chat.completions.create.call_args.kwargs["model"] == "llama3.2"
 
 
 def test_version_flag_prints_package_version():
@@ -58,7 +128,7 @@ def test_extract_command_reports_bad_schema_cleanly(tmp_path):
     bad_schema = tmp_path / "bad_schema.json"
     bad_schema.write_text('{"name": "Bad", "fields": "not a list"}')
 
-    result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(bad_schema)])
+    result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(bad_schema), "--api-key", "test-key"])
 
     assert result.exit_code == 1
     assert "Could not load schema" in result.output
@@ -72,7 +142,7 @@ def test_extract_command_writes_output_file(tmp_path):
     })
     output_path = tmp_path / "result.json"
     with patch("fastdocparse.llm_client.OpenAI", return_value=_mock_openai_returning(fake_result)):
-        result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH), "--output", str(output_path)])
+        result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH), "--output", str(output_path), "--api-key", "test-key"])
 
     assert result.exit_code == 0
     assert output_path.exists()
@@ -86,7 +156,7 @@ def test_schema_from_text_success(tmp_path):
     })
     output_path = tmp_path / "generated.json"
     with patch("fastdocparse.llm_client.OpenAI", return_value=_mock_openai_returning(fake_schema)):
-        result = runner.invoke(app, ["schema-from-text", "the bill of lading number", "--output", str(output_path)])
+        result = runner.invoke(app, ["schema-from-text", "the bill of lading number", "--output", str(output_path), "--api-key", "test-key"])
 
     assert result.exit_code == 0
     assert output_path.exists()
@@ -102,14 +172,14 @@ def test_extract_command_creates_missing_output_directory(tmp_path):
     })
     output_path = tmp_path / "nested" / "dir" / "result.json"
     with patch("fastdocparse.llm_client.OpenAI", return_value=_mock_openai_returning(fake_result)):
-        result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH), "--output", str(output_path)])
+        result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH), "--output", str(output_path), "--api-key", "test-key"])
 
     assert result.exit_code == 0
     assert output_path.exists()
 
 
 def test_extract_command_rejects_unregistered_kind_cleanly():
-    result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH), "--kind", "docx"])
+    result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH), "--kind", "docx", "--api-key", "test-key"])
 
     assert result.exit_code == 1
     assert "No ingestion handler registered" in result.output
@@ -125,7 +195,7 @@ def test_extract_command_passes_max_pages_to_document_parser():
         parser = parser_cls.return_value
         parser.extract.return_value = fake_result
 
-        result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH), "--max-pages", "5"])
+        result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH), "--max-pages", "5", "--api-key", "test-key"])
 
     assert result.exit_code == 0
     _, kwargs = parser_cls.call_args
@@ -134,7 +204,7 @@ def test_extract_command_passes_max_pages_to_document_parser():
 
 
 def test_extract_command_reports_invalid_max_pages_cleanly():
-    result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH), "--max-pages", "0"])
+    result = runner.invoke(app, ["extract", str(SAMPLE_IMAGE), str(INVOICE_SCHEMA_PATH), "--max-pages", "0", "--api-key", "test-key"])
 
     assert result.exit_code == 1
     assert "max_pages must be positive" in result.output
@@ -148,7 +218,7 @@ def test_schema_from_text_creates_missing_output_directory(tmp_path):
     })
     output_path = tmp_path / "nested" / "dir" / "generated.json"
     with patch("fastdocparse.llm_client.OpenAI", return_value=_mock_openai_returning(fake_schema)):
-        result = runner.invoke(app, ["schema-from-text", "the bill of lading number", "--output", str(output_path)])
+        result = runner.invoke(app, ["schema-from-text", "the bill of lading number", "--output", str(output_path), "--api-key", "test-key"])
 
     assert result.exit_code == 0
     assert output_path.exists()
@@ -157,7 +227,7 @@ def test_schema_from_text_creates_missing_output_directory(tmp_path):
 def test_schema_from_text_reports_generation_failure_cleanly(tmp_path):
     output_path = tmp_path / "generated.json"
     with patch("fastdocparse.llm_client.OpenAI", return_value=_mock_openai_returning("not json at all")):
-        result = runner.invoke(app, ["schema-from-text", "vague request", "--output", str(output_path)])
+        result = runner.invoke(app, ["schema-from-text", "vague request", "--output", str(output_path), "--api-key", "test-key"])
 
     assert result.exit_code == 1
     assert "Could not generate a schema" in result.output
