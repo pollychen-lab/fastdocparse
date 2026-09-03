@@ -1,9 +1,11 @@
 """Tests for the CLI entrypoint."""
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
 from fastdocparse import __version__
@@ -225,6 +227,10 @@ def test_list_schemas_shows_bundled_schemas():
     assert "invoice" in result.output.lower()
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="chmod(0o000) does not reliably make a file unreadable on Windows.",
+)
 def test_extract_command_rejects_unreadable_schema_cleanly(tmp_path):
     """A schema that exists but can't be read (permission denied) must fail with a clean
     Typer-level error, not skip straight past the friendly-missing-schema path and crash
